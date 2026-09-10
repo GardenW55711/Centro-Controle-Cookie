@@ -494,6 +494,40 @@
     <button class="primary" onclick="addStockMove('saida')">Registrar saída</button>
   </div>
 
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Marcar pedidos de um dia como produzidos</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Marca todos os pedidos com entrega nessa data como produzidos de uma vez, descontando o estoque conforme as receitas.</div>
+    <div class="form-grid">
+      <div>
+        <label>Data</label>
+        <input id="bulk-produzido-data" type="date">
+      </div>
+    </div>
+    <button class="primary" onclick="bulkMarkProduzido()">Marcar pedidos desse dia como produzidos</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Zerar estoque</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Leva o saldo de todas as matérias-primas visíveis pra você a zero (lança um ajuste de entrada/saída pra compensar), sem apagar os itens ou o histórico. Use isso pra recontar o estoque do zero.</div>
+    <button class="primary" onclick="zerarEstoque()">Zerar saldo de todas as matérias-primas</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Mesclar nomes duplicados</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Se o mesmo insumo aparece duas vezes com nomes escritos diferente (ex: "açúcar mascavo" e "Açúcar Mascavo"), escolha o nome "de" e o nome "para" — todas as movimentações do primeiro passam a usar o segundo nome.</div>
+    <div class="form-grid">
+      <div>
+        <label>De (nome duplicado)</label>
+        <select id="merge-de"></select>
+      </div>
+      <div>
+        <label>Para (nome que vai ficar)</label>
+        <select id="merge-para"></select>
+      </div>
+    </div>
+    <button class="primary" onclick="mergeInsumoNames()">Mesclar</button>
+  </div>
+
   <div class="section-title">Estoque atual</div>
   <div id="stock-overview-list"></div>
 
@@ -1128,7 +1162,19 @@ function deleteOrder(id) {
 }
 
 function itemsSummary(items) {
-  return items.map(it => `${it.quantidade}× ${it.produto}`).join(' · ');
+  return (items || []).map(it => `${it.quantidade}× ${it.produto}`).join(' · ');
+}
+
+function safeOrderHTML(o) {
+  try {
+    return orderHTML(o);
+  } catch (e) {
+    console.error('Erro ao renderizar pedido', o && o.id, e);
+    return `<div class="order" style="border-left-color:#B33A3A;">
+      <div style="color:#B33A3A;font-size:12.5px;font-weight:600;">⚠️ Não foi possível exibir este pedido</div>
+      <div style="font-size:11.5px;color:#A0917F;margin-top:4px;">ID: ${escapeHtml((o && o.id) || '?')} — Erro: ${escapeHtml(e.message)}</div>
+    </div>`;
+  }
 }
 
 function render() {
@@ -1141,16 +1187,16 @@ function render() {
   document.getElementById('entregues-wrap').style.display = aguardandoPagamento.length ? 'block' : 'none';
 
   document.getElementById('pendentes-list').innerHTML = pendentes.length
-    ? pendentes.map(orderHTML).join('')
+    ? pendentes.map(safeOrderHTML).join('')
     : '<div class="empty">Nenhuma encomenda pendente.</div>';
-  document.getElementById('entregues-list').innerHTML = aguardandoPagamento.map(orderHTML).join('');
+  document.getElementById('entregues-list').innerHTML = aguardandoPagamento.map(safeOrderHTML).join('');
 }
 
 function renderHistorico() {
   const finalizados = orders.filter(o => o.status === 'entregue' && o.pago && canSeeOwner(o.donoId))
     .sort((a,b) => (b.dataEntrega || '').localeCompare(a.dataEntrega || ''));
   document.getElementById('historico-list').innerHTML = finalizados.length
-    ? finalizados.map(orderHTML).join('')
+    ? finalizados.map(safeOrderHTML).join('')
     : '<div class="empty">Nenhum pedido finalizado ainda.</div>';
 }
 
@@ -1331,19 +1377,45 @@ function renderCalProductionSummary(year, month) {
     </div>
   `;
 }
+function dayProductionSummaryHTML(dayOrders) {
+  const byProduct = {};
+  PRODUCTS.forEach(p => byProduct[p] = 0);
+  let total = 0;
+  dayOrders.forEach(o => (o.items || []).forEach(it => {
+    byProduct[it.produto] = (byProduct[it.produto] || 0) + it.quantidade;
+    total += it.quantidade;
+  }));
+  if (!total) return '';
+  return `
+    <div class="card" style="background:#FCEEDD;box-shadow:none;padding:12px 14px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:#B5651D;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:6px;">Resumo pra produzir nesse dia</div>
+      ${PRODUCTS.map(p => `
+        <div class="prod-summary-item" style="padding:6px 0;">
+          <div style="font-size:13px;">${p}</div>
+          <div class="prod-summary-qty">${byProduct[p]} un</div>
+        </div>
+      `).join('')}
+      <div class="prod-summary-item total" style="padding-top:8px;margin-top:2px;">
+        <div>Total</div>
+        <div class="prod-summary-qty">${total} un</div>
+      </div>
+    </div>
+  `;
+}
+
 function openDay(iso) {
   currentModalDay = iso;
   const dayOrders = ordersByDate(iso);
   const [y,m,d] = iso.split('-');
   document.getElementById('modal-title').textContent = `${d} de ${MONTHS[parseInt(m)-1]} — ${dayOrders.length} pedido(s)`;
-  document.getElementById('modal-body').innerHTML = dayOrders.map(orderHTML).join('');
+  document.getElementById('modal-body').innerHTML = dayProductionSummaryHTML(dayOrders) + dayOrders.map(safeOrderHTML).join('');
   document.getElementById('modal-overlay').classList.add('open');
 }
 function refreshOpenModal() {
   if (currentModalDay && document.getElementById('modal-overlay').classList.contains('open')) {
     const dayOrders = ordersByDate(currentModalDay);
     if (!dayOrders.length) { closeModal(); renderCalendar(); return; }
-    document.getElementById('modal-body').innerHTML = dayOrders.map(orderHTML).join('');
+    document.getElementById('modal-body').innerHTML = dayProductionSummaryHTML(dayOrders) + dayOrders.map(safeOrderHTML).join('');
   }
   renderCalendar();
 }
@@ -1431,6 +1503,9 @@ function renderChart(canvasId, type, labels, datasets, key) {
 function initStockSync() {
   document.getElementById('se-data').value = todayISO();
   document.getElementById('ss-data').value = todayISO();
+  const ontem = new Date();
+  ontem.setDate(ontem.getDate() - 1);
+  document.getElementById('bulk-produzido-data').value = ontem.toISOString().slice(0,10);
 
   stockRef.onSnapshot(snapshot => {
     stockMoves = snapshot.docs.map(doc => {
@@ -1477,12 +1552,141 @@ function deleteStockMove(id) {
   stockRef.doc(id).delete();
 }
 
+/* ---------- FERRAMENTAS EM LOTE DE ESTOQUE ---------- */
+
+async function bulkMarkProduzido() {
+  if (!hasAccess('estoque')) {
+    alert('Você não tem permissão de acesso à aba Estoque.');
+    return;
+  }
+  const data = document.getElementById('bulk-produzido-data').value;
+  if (!data) {
+    alert('Escolha uma data.');
+    return;
+  }
+
+  const alvo = orders.filter(o => o.dataEntrega === data && canSeeOwner(o.donoId) && !o.produzido);
+  if (!alvo.length) {
+    alert('Não há pedidos não-produzidos com entrega nessa data.');
+    return;
+  }
+
+  const semReceita = new Set();
+  const movimentos = [];
+
+  alvo.forEach(o => {
+    o.items.forEach(item => {
+      const receita = findRecipeForProduct(item.produto);
+      if (!receita || !receita.ingredientes.length) {
+        semReceita.add(item.produto);
+        return;
+      }
+      receita.ingredientes.forEach(ing => {
+        if (typeof ing === 'string' || !ing.nome || !ing.quantidade) return;
+        movimentos.push({ insumo: ing.nome, quantidade: ing.quantidade * item.quantidade, unidade: ing.unidade || '' });
+      });
+    });
+  });
+
+  let msg = `Marcar ${alvo.length} pedido(s) do dia ${fmtDate(data)} como produzidos e descontar o estoque?`;
+  if (semReceita.size) {
+    msg += `\n\nAtenção: não encontrei receita completa pra: ${[...semReceita].join(', ')}. O estoque não será descontado pra esse(s) item(ns).`;
+  }
+  if (!confirm(msg)) return;
+
+  try {
+    const batch = db.batch();
+    alvo.forEach(o => batch.update(ordersRef.doc(o.id), { produzido: true }));
+    movimentos.forEach(m => {
+      const moveRef = stockRef.doc();
+      batch.set(moveRef, {
+        tipo: 'saida', insumo: m.insumo, quantidade: m.quantidade, unidade: m.unidade,
+        data: todayISO(), obs: `Baixa automática em lote — produção do dia ${fmtDate(data)}`,
+        donoId: currentAccount.id
+      });
+    });
+    await batch.commit();
+    alert('Pronto! Pedidos marcados como produzidos e estoque atualizado.');
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+}
+
+async function zerarEstoque() {
+  const visibleMoves = stockMoves.filter(m => canSeeOwner(m.donoId));
+  const saldo = {};
+  visibleMoves.forEach(m => {
+    const key = m.insumo + '||' + m.unidade;
+    if (!saldo[key]) saldo[key] = { insumo: m.insumo, unidade: m.unidade, total: 0 };
+    saldo[key].total += (m.tipo === 'entrada' ? m.quantidade : -m.quantidade);
+  });
+  const itensParaZerar = Object.values(saldo).filter(s => s.total !== 0);
+
+  if (!itensParaZerar.length) {
+    alert('O estoque já está zerado.');
+    return;
+  }
+  if (!confirm(`Isso vai lançar um ajuste em ${itensParaZerar.length} matéria(s)-prima(s) pra deixar o saldo de cada uma em 0, mantendo os itens cadastrados e o histórico. Confirma?`)) return;
+
+  try {
+    const batch = db.batch();
+    itensParaZerar.forEach(item => {
+      const moveRef = stockRef.doc();
+      batch.set(moveRef, {
+        tipo: item.total > 0 ? 'saida' : 'entrada',
+        insumo: item.insumo,
+        quantidade: Math.abs(item.total),
+        unidade: item.unidade,
+        data: todayISO(),
+        obs: 'Ajuste de zeragem — recontagem de estoque',
+        donoId: currentAccount.id
+      });
+    });
+    await batch.commit();
+    alert('Estoque zerado! Agora é só lançar as entradas com as quantidades reais.');
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+}
+
+async function mergeInsumoNames() {
+  const de = document.getElementById('merge-de').value;
+  const para = document.getElementById('merge-para').value;
+  if (!de || !para) {
+    alert('Escolha os dois nomes.');
+    return;
+  }
+  if (de === para) {
+    alert('Escolha nomes diferentes.');
+    return;
+  }
+  const afetados = stockMoves.filter(m => m.insumo === de && canSeeOwner(m.donoId));
+  if (!afetados.length) {
+    alert('Não encontrei movimentações com esse nome.');
+    return;
+  }
+  if (!confirm(`Renomear ${afetados.length} movimentação(ões) de "${de}" para "${para}"?`)) return;
+
+  try {
+    const batch = db.batch();
+    afetados.forEach(m => batch.update(stockRef.doc(m.id), { insumo: para }));
+    await batch.commit();
+    alert('Mesclado com sucesso!');
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+}
+
 function renderStock() {
   const visibleMoves = stockMoves.filter(m => canSeeOwner(m.donoId));
 
   // Datalist de insumos já cadastrados, pra facilitar a saída
   const insumosUnicos = [...new Set(visibleMoves.map(m => m.insumo))].sort();
   document.getElementById('insumos-list').innerHTML = insumosUnicos.map(i => `<option value="${escapeHtml(i)}">`).join('');
+
+  const mergeOptions = insumosUnicos.map(i => `<option value="${escapeHtml(i)}">${escapeHtml(i)}</option>`).join('');
+  document.getElementById('merge-de').innerHTML = mergeOptions;
+  document.getElementById('merge-para').innerHTML = mergeOptions;
 
   // Saldo atual por insumo + unidade
   const saldo = {};
