@@ -210,6 +210,38 @@
   .stock-item-qty { font-weight: 800; font-size: 15px; color: #B5651D; }
   .stock-item-qty.low { color: #B33A3A; }
 
+  /* Níveis de alerta de estoque */
+  .nivel-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; flex-shrink:0; }
+  .nivel-dot.verde { background:#567048; }
+  .nivel-dot.amarelo { background:#D9A441; }
+  .nivel-dot.vermelho { background:#B33A3A; }
+  .stock-item.nivel-amarelo { background:#FFFBEF; border:1px solid #F0DDA8; }
+  .stock-item.nivel-vermelho { background:#FDECEA; border:1px solid #F0B8B0; }
+  .threshold-row {
+    display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #F0E6D8;
+  }
+  .threshold-row:last-child { border-bottom:none; }
+  .threshold-row-name { flex:2; font-size:13.5px; font-weight:600; }
+  .threshold-row input { flex:1; min-width:0; }
+  .threshold-row label { font-size:10.5px; color:#A0917F; display:block; margin-bottom:2px; }
+
+  /* Sininho de notificações */
+  .topbar-actions { display:flex; align-items:center; gap:8px; }
+  .bell-btn { position: relative; }
+  .bell-badge {
+    position:absolute; top:-4px; right:-4px; background:#B33A3A; color:white;
+    font-size:10px; font-weight:800; border-radius:20px; min-width:16px; height:16px;
+    display:flex; align-items:center; justify-content:center; padding:0 4px;
+  }
+  .alert-live-item {
+    display:flex; align-items:center; justify-content:space-between; padding:10px 12px;
+    border-radius:10px; margin-bottom:8px;
+  }
+  .alert-history-row {
+    display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #F0E6D8; font-size:12.5px;
+  }
+  .alert-history-row:last-child { border-bottom:none; }
+
   .prod-summary-item {
     display: flex; justify-content: space-between; align-items: center;
     padding: 10px 0; border-bottom: 1px solid #F0E6D8; font-size: 14px;
@@ -357,7 +389,10 @@
   <div>
     <h1>🍪 Copo de Cookie</h1>
   </div>
-  <button class="kebab-btn" onclick="openDrawer()">⋮</button>
+  <div class="topbar-actions">
+    <button class="kebab-btn bell-btn" onclick="openAlertsPanel()">🔔<span id="bell-badge" class="bell-badge" style="display:none">0</span></button>
+    <button class="kebab-btn" onclick="openDrawer()">⋮</button>
+  </div>
 </div>
 <div class="subtitle">Pedidos, entregas, vendas e receitas</div>
 <div class="current-tab" id="current-tab-label">📋 Pedidos</div>
@@ -426,27 +461,48 @@
 </div>
 
 <!-- VIEW: ESTOQUE -->
-<div id="view-estoque" class="view">
+<div id="view-estoque-gestao" class="view">
   <div class="card">
-    <div class="section-title" style="margin-top:0">Registrar entrada</div>
+    <div class="section-title" style="margin-top:0" id="si-form-title">Novo item de estoque</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Cadastre aqui as matérias-primas antes de lançar entradas/saídas ou vincular em receitas.</div>
     <div class="form-grid">
       <div>
-        <label>Matéria-prima</label>
-        <input id="se-insumo" type="text" placeholder="Ex: Farinha de trigo">
-      </div>
-      <div>
-        <label>Quantidade</label>
-        <input id="se-quantidade" type="number" min="0" step="0.01" placeholder="0">
+        <label>Nome do item</label>
+        <input id="si-nome" type="text" placeholder="Ex: Farinha de trigo">
       </div>
       <div>
         <label>Unidade</label>
-        <select id="se-unidade">
+        <select id="si-unidade">
           <option value="g">g</option>
           <option value="kg">kg</option>
           <option value="ml">ml</option>
           <option value="l">l</option>
           <option value="un">unidade</option>
         </select>
+      </div>
+    </div>
+    <button class="primary" id="si-submit-btn" onclick="submitStockItem()">Salvar item</button>
+    <button class="secondary" id="si-cancel-btn" style="display:none" onclick="cancelEditStockItem()">Cancelar edição</button>
+  </div>
+
+  <div class="section-title">Itens cadastrados</div>
+  <div id="stock-items-list" style="margin-bottom:18px;"></div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Registrar entrada</div>
+    <div class="form-grid">
+      <div>
+        <label>Item de estoque</label>
+        <div class="client-search-wrap">
+          <input id="se-item-search" type="text" placeholder="Buscar item cadastrado..." autocomplete="off"
+                 oninput="renderItemDropdown('se', this.value)" onfocus="renderItemDropdown('se', this.value)">
+          <div id="se-item-dropdown" class="client-dropdown"></div>
+        </div>
+        <div id="se-item-selected"></div>
+      </div>
+      <div>
+        <label>Quantidade</label>
+        <input id="se-quantidade" type="number" min="0" step="0.01" placeholder="0">
       </div>
       <div>
         <label>Data</label>
@@ -461,26 +517,21 @@
   </div>
 
   <div class="card">
-    <div class="section-title" style="margin-top:0">Registrar saída (utilização)</div>
+    <div class="section-title" style="margin-top:0">Registrar saída (ajuste manual)</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Use isso só pra ajustes manuais — a saída por produção é lançada automaticamente ao marcar um pedido como produzido.</div>
     <div class="form-grid">
       <div>
-        <label>Matéria-prima</label>
-        <input id="ss-insumo" type="text" placeholder="Ex: Farinha de trigo" list="insumos-list">
-        <datalist id="insumos-list"></datalist>
+        <label>Item de estoque</label>
+        <div class="client-search-wrap">
+          <input id="ss-item-search" type="text" placeholder="Buscar item cadastrado..." autocomplete="off"
+                 oninput="renderItemDropdown('ss', this.value)" onfocus="renderItemDropdown('ss', this.value)">
+          <div id="ss-item-dropdown" class="client-dropdown"></div>
+        </div>
+        <div id="ss-item-selected"></div>
       </div>
       <div>
         <label>Quantidade</label>
         <input id="ss-quantidade" type="number" min="0" step="0.01" placeholder="0">
-      </div>
-      <div>
-        <label>Unidade</label>
-        <select id="ss-unidade">
-          <option value="g">g</option>
-          <option value="kg">kg</option>
-          <option value="ml">ml</option>
-          <option value="l">l</option>
-          <option value="un">unidade</option>
-        </select>
       </div>
       <div>
         <label>Data</label>
@@ -488,7 +539,7 @@
       </div>
       <div>
         <label>Observação (opcional)</label>
-        <input id="ss-obs" type="text" placeholder="Ex: usado na fornada de sexta">
+        <input id="ss-obs" type="text" placeholder="Ex: ajuste de contagem">
       </div>
     </div>
     <button class="primary" onclick="addStockMove('saida')">Registrar saída</button>
@@ -496,7 +547,7 @@
 
   <div class="card">
     <div class="section-title" style="margin-top:0">Marcar pedidos de um dia como produzidos</div>
-    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Marca todos os pedidos com entrega nessa data como produzidos de uma vez, descontando o estoque conforme as receitas.</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Marca todos os pedidos com entrega nessa data como produzidos de uma vez, descontando o estoque conforme as receitas (Cookie + Ganache do sabor).</div>
     <div class="form-grid">
       <div>
         <label>Data</label>
@@ -514,7 +565,7 @@
 
   <div class="card">
     <div class="section-title" style="margin-top:0">Mesclar nomes duplicados</div>
-    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Se o mesmo insumo aparece duas vezes com nomes escritos diferente (ex: "açúcar mascavo" e "Açúcar Mascavo"), escolha o nome "de" e o nome "para" — todas as movimentações do primeiro passam a usar o segundo nome.</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Pra corrigir movimentações antigas que usaram nomes diferentes pro mesmo item. Escolha o nome "de" e o nome "para".</div>
     <div class="form-grid">
       <div>
         <label>De (nome duplicado)</label>
@@ -528,12 +579,23 @@
     <button class="primary" onclick="mergeInsumoNames()">Mesclar</button>
   </div>
 
-  <div class="section-title">Estoque atual</div>
-  <div id="stock-overview-list"></div>
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Limites de aviso de estoque</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">
+      Defina, pra cada item, a partir de qual quantidade ele fica <strong>🟡 amarelo</strong> (atenção, estoque abaixando) e <strong>🔴 vermelho</strong> (estoque baixo). Acima do valor amarelo, o item fica <strong>🟢 verde</strong>. Salva sozinho ao sair do campo.
+    </div>
+    <div id="threshold-list"></div>
+  </div>
 
   <div class="section-title">Movimentações recentes</div>
   <div class="card" id="stock-moves-list"></div>
 </div>
+
+<div id="view-estoque-visao" class="view">
+  <div style="font-size:12px;color:#A0917F;margin:0 0 12px 4px;">Saldo atual de cada matéria-prima (entradas − saídas). As cores refletem os limites definidos em Gerenciamento de Estoque.</div>
+  <div id="stock-overview-list"></div>
+</div>
+
 
 <!-- VIEW: CALENDARIO -->
 <div id="view-calendario" class="view">
@@ -773,7 +835,8 @@
     <div class="drawer-item" data-tab="historico" onclick="switchTab('historico')"><span class="emoji">🗂️</span> Histórico</div>
     <div class="drawer-item" data-tab="calendario" onclick="switchTab('calendario')"><span class="emoji">📅</span> Calendário</div>
     <div class="drawer-item" data-tab="vendas" onclick="switchTab('vendas')"><span class="emoji">📊</span> Vendas</div>
-    <div class="drawer-item" data-tab="estoque" onclick="switchTab('estoque')"><span class="emoji">📦</span> Estoque</div>
+    <div class="drawer-item" data-tab="estoque-gestao" onclick="switchTab('estoque-gestao')"><span class="emoji">📦</span> Gerenciamento de Estoque</div>
+    <div class="drawer-item" data-tab="estoque-visao" onclick="switchTab('estoque-visao')"><span class="emoji">📊</span> Visão de Estoque</div>
     <div class="drawer-item" data-tab="gerenciar-receitas" onclick="switchTab('gerenciar-receitas')"><span class="emoji">📝</span> Gerenciar receitas</div>
     <div class="drawer-item" data-tab="receitas-publicas" onclick="switchTab('receitas-publicas')"><span class="emoji">📖</span> Receitas</div>
     <div class="drawer-item" data-tab="cadastro-clientes" onclick="switchTab('cadastro-clientes')"><span class="emoji">🧑‍🤝‍🧑</span> Cadastro de clientes</div>
@@ -851,6 +914,17 @@
   </div>
 </div>
 
+<!-- MODAL: PAINEL DE NOTIFICAÇÕES -->
+<div class="modal-overlay" id="alerts-panel-overlay" onclick="closeAlertsPanelBg(event)">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">🔔 Notificações de estoque</div>
+      <button class="modal-close" onclick="closeAlertsPanel()">✕</button>
+    </div>
+    <div id="alerts-panel-body"></div>
+  </div>
+</div>
+
 </div>
 <!-- fim app-root -->
 
@@ -871,6 +945,9 @@ const stockRef = db.collection('stock_moves');
 const clientsRef = db.collection('clients');
 const accountsRef = db.collection('accounts');
 const pricingRef = db.collection('pricing_profiles');
+const stockItemsRef = db.collection('stock_items');
+const stockAlertsRef = db.collection('stock_alerts');
+const stockLevelStateRef = db.collection('stock_level_state');
 
 const PRODUCTS = [
   "Copo de Cookie (ao leite)",
@@ -878,6 +955,19 @@ const PRODUCTS = [
   "Copo de Cookie (Ninho)"
 ];
 const PRODUCT_COLORS = ["#B5651D", "#5C3A21", "#D9A441"];
+
+const RECIPE_CATEGORIES = [
+  'Cookie',
+  'Ganache de chocolate ao leite',
+  'Ganache de chocolate meio amargo',
+  'Ganache de Leite Ninho'
+];
+const GANACHE_POR_SABOR = {
+  'Copo de Cookie (ao leite)': 'Ganache de chocolate ao leite',
+  'Copo de Cookie (meio amargo)': 'Ganache de chocolate meio amargo',
+  'Copo de Cookie (Ninho)': 'Ganache de Leite Ninho'
+};
+const UNIDADES_ESTOQUE = ['g', 'kg', 'ml', 'l', 'un'];
 
 const ASSIGNABLE_TABS = [
   { key: 'pedidos', label: 'Pedidos' },
@@ -894,6 +984,11 @@ const DEFAULT_ADMIN = { usuario: 'ederalmeida', senha: '159753', isAdmin: true, 
 
 let accounts = [];
 let pricingProfiles = [];
+let stockItems = [];
+let stockAlerts = [];
+let alertsCheckInProgress = false;
+let editingStockItemId = null;
+let itemSelections = {}; // { [contexto]: { id, nome, unidade } }
 let editingPricingId = null;
 let pricingItemCount = 0;
 let currentAccount = null;
@@ -960,7 +1055,8 @@ function switchTab(tab) {
     'calendario': '📅 Calendário',
     'vendas': '📊 Vendas',
     'historico': '🗂️ Histórico',
-    'estoque': '📦 Estoque',
+    'estoque-gestao': '📦 Gerenciamento de Estoque',
+    'estoque-visao': '📊 Visão de Estoque',
     'gerenciar-receitas': '📝 Gerenciar receitas',
     'receitas-publicas': '📖 Receitas',
     'cadastro-clientes': '🧑\u200d🤝\u200d🧑 Cadastro de clientes',
@@ -970,7 +1066,7 @@ function switchTab(tab) {
   };
   document.getElementById('current-tab-label').textContent = labels[tab] || tab;
 
-  const tabs = ['pedidos','calendario','vendas','historico','estoque','gerenciar-receitas','receitas-publicas','cadastro-clientes','analise-clientes','contas','precificacao'];
+  const tabs = ['pedidos','calendario','vendas','historico','estoque-gestao','estoque-visao','gerenciar-receitas','receitas-publicas','cadastro-clientes','analise-clientes','contas','precificacao'];
   tabs.forEach(t => {
     document.getElementById('view-'+t).classList.toggle('active', t === tab);
   });
@@ -981,7 +1077,8 @@ function switchTab(tab) {
   if (tab === 'calendario') renderCalendar();
   if (tab === 'vendas') renderVendas();
   if (tab === 'historico') renderHistorico();
-  if (tab === 'estoque') renderStock();
+  if (tab === 'estoque-gestao') renderStock();
+  if (tab === 'estoque-visao') renderStockOverview();
   if (tab === 'gerenciar-receitas') renderRecipesManageList();
   if (tab === 'receitas-publicas') renderRecipesPublicList();
   if (tab === 'cadastro-clientes') renderClientsManageList();
@@ -1093,12 +1190,42 @@ function togglePago(id) {
   ordersRef.doc(id).update({ pago: !o.pago });
 }
 
-function findRecipeForProduct(produto) {
-  return recipes.find(r => r.produto === produto);
+function findRecipeByCategory(categoria) {
+  return recipes.find(r => r.produto === categoria);
+}
+
+function getRecipeCategoriasForItem(produto) {
+  const ganache = GANACHE_POR_SABOR[produto];
+  return ganache ? ['Cookie', ganache] : ['Cookie'];
+}
+
+function calcularMovimentosDeProducao(items) {
+  const semReceita = [];
+  const movimentos = [];
+
+  items.forEach(item => {
+    getRecipeCategoriasForItem(item.produto).forEach(categoria => {
+      const receita = findRecipeByCategory(categoria);
+      if (!receita || !receita.ingredientes.length) {
+        semReceita.push(`${categoria} (${item.produto})`);
+        return;
+      }
+      receita.ingredientes.forEach(ing => {
+        if (typeof ing === 'string' || !ing.nome || !ing.quantidade) return;
+        movimentos.push({
+          insumo: ing.nome,
+          quantidade: ing.quantidade * item.quantidade,
+          unidade: ing.unidade || ''
+        });
+      });
+    });
+  });
+
+  return { semReceita, movimentos };
 }
 
 async function toggleProduzido(id) {
-  if (!hasAccess('estoque')) {
+  if (!hasAccess('estoque-gestao')) {
     alert('Você não tem permissão de acesso à aba Estoque, então não pode marcar produção (isso afeta o estoque).');
     return;
   }
@@ -1106,27 +1233,10 @@ async function toggleProduzido(id) {
   if (!o) return;
   const novoValor = !o.produzido;
 
-  const semReceita = [];
-  const movimentos = []; // { insumo, quantidade, unidade }
-
-  o.items.forEach(item => {
-    const receita = findRecipeForProduct(item.produto);
-    if (!receita || !receita.ingredientes.length) {
-      semReceita.push(item.produto);
-      return;
-    }
-    receita.ingredientes.forEach(ing => {
-      if (typeof ing === 'string' || !ing.nome || !ing.quantidade) return;
-      movimentos.push({
-        insumo: ing.nome,
-        quantidade: ing.quantidade * item.quantidade,
-        unidade: ing.unidade || ''
-      });
-    });
-  });
+  const { semReceita, movimentos } = calcularMovimentosDeProducao(o.items);
 
   if (semReceita.length && !confirm(
-    `Não encontrei receita com ingredientes cadastrados pra: ${semReceita.join(', ')}. O estoque não será descontado pra esse(s) item(ns). Continuar mesmo assim?`
+    `Não encontrei receita completa pra: ${semReceita.join(', ')}. O estoque não será descontado pra esse(s) item(ns). Continuar mesmo assim?`
   )) {
     return;
   }
@@ -1223,7 +1333,7 @@ function orderHTML(o) {
         <button onclick="openEditOrder('${o.id}')">✏️ Editar</button>
         <button class="btn-done" onclick="toggleStatus('${o.id}')">${isDone ? '↩ Reabrir' : '✓ Marcar entregue'}</button>
         <button class="btn-pago" onclick="togglePago('${o.id}')">${isPago ? '↩ Desmarcar pago' : '💰 Marcar como pago'}</button>
-        ${hasAccess('estoque') ? `<button onclick="toggleProduzido('${o.id}')">${isProduzido ? '↩ Desmarcar produzido' : '🏭 Marcar como produzido'}</button>` : ''}
+        ${hasAccess('estoque-gestao') ? `<button onclick="toggleProduzido('${o.id}')">${isProduzido ? '↩ Desmarcar produzido' : '🏭 Marcar como produzido'}</button>` : ''}
         <button class="btn-del" onclick="deleteOrder('${o.id}')">🗑 Remover</button>
       </div>
     </div>
@@ -1521,27 +1631,32 @@ function initStockSync() {
         donoId: data.donoId || null
       };
     });
-    if (activeTab === 'estoque') renderStock();
+    if (activeTab === 'estoque-gestao') renderStock();
+    if (activeTab === 'estoque-visao') renderStockOverview();
+    checkAndLogStockAlerts();
   }, err => console.error('Erro de sincronização de estoque', err));
 }
 
 function addStockMove(tipo) {
   const prefix = tipo === 'entrada' ? 'se' : 'ss';
-  const insumo = document.getElementById(prefix + '-insumo').value.trim();
+  const sel = itemSelections[prefix];
   const quantidade = parseFloat(document.getElementById(prefix + '-quantidade').value);
-  const unidade = document.getElementById(prefix + '-unidade').value;
   const data = document.getElementById(prefix + '-data').value;
   const obs = document.getElementById(prefix + '-obs').value.trim();
 
-  if (!insumo || !quantidade || quantidade <= 0 || !data) {
-    alert('Preencha matéria-prima, quantidade (maior que zero) e data.');
+  if (!sel) {
+    alert('Escolha um item cadastrado na busca.');
+    return;
+  }
+  if (!quantidade || quantidade <= 0 || !data) {
+    alert('Preencha a quantidade (maior que zero) e a data.');
     return;
   }
 
-  stockRef.add({ tipo, insumo, quantidade, unidade, data, obs, donoId: currentAccount.id })
+  stockRef.add({ tipo, insumo: sel.nome, quantidade, unidade: sel.unidade, data, obs, donoId: currentAccount.id })
     .catch(err => alert('Erro ao salvar: ' + err.message));
 
-  document.getElementById(prefix + '-insumo').value = '';
+  clearItemSelection(prefix);
   document.getElementById(prefix + '-quantidade').value = '';
   document.getElementById(prefix + '-obs').value = '';
   document.getElementById(prefix + '-data').value = todayISO();
@@ -1552,10 +1667,150 @@ function deleteStockMove(id) {
   stockRef.doc(id).delete();
 }
 
+/* ---------- ALERTAS DE ESTOQUE ---------- */
+
+function levelStateDocId(insumo) {
+  const safe = insumo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60);
+  return `${currentAccount.id}__${safe}`;
+}
+
+async function checkAndLogStockAlerts() {
+  if (!currentAccount || alertsCheckInProgress) return;
+  if (!stockItems.length || !stockMoves.length) return;
+  alertsCheckInProgress = true;
+
+  try {
+    const itensComLimite = stockItems.filter(i => i.limiteAmarelo != null && i.limiteVermelho != null);
+    for (const item of itensComLimite) {
+      const saldo = saldoAtualDoItem(item.nome);
+      const nivel = computeNivel(saldo, item);
+      const stateId = levelStateDocId(item.nome);
+      const stateSnap = await stockLevelStateRef.doc(stateId).get();
+      const nivelAnterior = stateSnap.exists ? stateSnap.data().nivel : null;
+
+      if (nivel !== nivelAnterior) {
+        await stockLevelStateRef.doc(stateId).set({
+          donoId: currentAccount.id, insumo: item.nome, nivel, atualizadoEm: todayISO()
+        });
+
+        if (nivel === 'amarelo' || nivel === 'vermelho') {
+          await stockAlertsRef.add({
+            donoId: currentAccount.id,
+            insumo: item.nome,
+            nivel,
+            quantidade: saldo,
+            unidade: item.unidade,
+            data: new Date().toISOString(),
+            lida: false
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao checar alertas de estoque', err);
+  } finally {
+    alertsCheckInProgress = false;
+  }
+}
+
+function initStockAlertsSync() {
+  stockAlertsRef.onSnapshot(snapshot => {
+    stockAlerts = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        donoId: data.donoId || null,
+        insumo: data.insumo || '',
+        nivel: data.nivel || 'amarelo',
+        quantidade: typeof data.quantidade === 'number' ? data.quantidade : 0,
+        unidade: data.unidade || '',
+        data: data.data || '',
+        lida: !!data.lida
+      };
+    });
+    renderBellBadge();
+    if (document.getElementById('alerts-panel-overlay').classList.contains('open')) renderAlertsPanel();
+  }, err => console.error('Erro de sincronização de alertas', err));
+}
+
+function meusAlertas() {
+  if (!currentAccount) return [];
+  return stockAlerts.filter(a => a.donoId === currentAccount.id);
+}
+
+function renderBellBadge() {
+  const badge = document.getElementById('bell-badge');
+  if (!badge) return;
+  const naoLidos = meusAlertas().filter(a => !a.lida).length;
+  badge.style.display = naoLidos ? 'flex' : 'none';
+  badge.textContent = naoLidos > 9 ? '9+' : naoLidos;
+}
+
+function openAlertsPanel() {
+  if (!currentAccount) return;
+  document.getElementById('alerts-panel-overlay').classList.add('open');
+  renderAlertsPanel();
+
+  const naoLidos = meusAlertas().filter(a => !a.lida);
+  if (naoLidos.length) {
+    const batch = db.batch();
+    naoLidos.forEach(a => batch.update(stockAlertsRef.doc(a.id), { lida: true }));
+    batch.commit().catch(err => console.error('Erro ao marcar notificações como lidas', err));
+  }
+}
+
+function closeAlertsPanel() {
+  document.getElementById('alerts-panel-overlay').classList.remove('open');
+}
+function closeAlertsPanelBg(e) {
+  if (e.target.id === 'alerts-panel-overlay') closeAlertsPanel();
+}
+
+function renderAlertsPanel() {
+  const wrap = document.getElementById('alerts-panel-body');
+  if (!wrap || !currentAccount) return;
+
+  // Itens em alerta agora (recalcula na hora)
+  const itensComLimite = stockItems.filter(i => i.limiteAmarelo != null && i.limiteVermelho != null);
+  const emAlertaAgora = itensComLimite.map(item => {
+    const saldo = saldoAtualDoItem(item.nome);
+    const nivel = computeNivel(saldo, item);
+    return { item, saldo, nivel };
+  }).filter(x => x.nivel === 'amarelo' || x.nivel === 'vermelho');
+
+  const historico = [...meusAlertas()].sort((a,b) => (b.data || '').localeCompare(a.data || '')).slice(0, 30);
+
+  let html = '<div class="section-title" style="margin-top:0">Itens em alerta agora</div>';
+  html += emAlertaAgora.length
+    ? emAlertaAgora.map(x => `
+        <div class="alert-live-item nivel-${x.nivel}">
+          <div><span class="nivel-dot ${x.nivel}"></span>${escapeHtml(x.item.nome)}</div>
+          <div style="font-weight:700;">${x.saldo.toLocaleString('pt-BR')} ${escapeHtml(x.item.unidade)}</div>
+        </div>
+      `).join('')
+    : '<div class="empty">Nenhum item em alerta no momento. 🎉</div>';
+
+  html += '<div class="section-title">Histórico de notificações</div>';
+  html += historico.length
+    ? historico.map(a => `
+        <div class="alert-history-row">
+          <span class="nivel-dot ${a.nivel}"></span>
+          <div style="flex:1;">
+            <strong>${escapeHtml(a.insumo)}</strong> ficou ${a.nivel === 'vermelho' ? '🔴 vermelho' : '🟡 amarelo'}
+            (${a.quantidade.toLocaleString('pt-BR')} ${escapeHtml(a.unidade)})
+          </div>
+          <div style="color:#A0917F;white-space:nowrap;">${fmtDate(a.data.slice(0,10))}</div>
+        </div>
+      `).join('')
+    : '<div class="empty">Nenhuma notificação registrada ainda.</div>';
+
+  wrap.innerHTML = html;
+}
+
 /* ---------- FERRAMENTAS EM LOTE DE ESTOQUE ---------- */
 
 async function bulkMarkProduzido() {
-  if (!hasAccess('estoque')) {
+  if (!hasAccess('estoque-gestao')) {
     alert('Você não tem permissão de acesso à aba Estoque.');
     return;
   }
@@ -1571,26 +1826,18 @@ async function bulkMarkProduzido() {
     return;
   }
 
-  const semReceita = new Set();
+  const semReceitaSet = new Set();
   const movimentos = [];
 
   alvo.forEach(o => {
-    o.items.forEach(item => {
-      const receita = findRecipeForProduct(item.produto);
-      if (!receita || !receita.ingredientes.length) {
-        semReceita.add(item.produto);
-        return;
-      }
-      receita.ingredientes.forEach(ing => {
-        if (typeof ing === 'string' || !ing.nome || !ing.quantidade) return;
-        movimentos.push({ insumo: ing.nome, quantidade: ing.quantidade * item.quantidade, unidade: ing.unidade || '' });
-      });
-    });
+    const r = calcularMovimentosDeProducao(o.items);
+    r.semReceita.forEach(s => semReceitaSet.add(s));
+    movimentos.push(...r.movimentos);
   });
 
   let msg = `Marcar ${alvo.length} pedido(s) do dia ${fmtDate(data)} como produzidos e descontar o estoque?`;
-  if (semReceita.size) {
-    msg += `\n\nAtenção: não encontrei receita completa pra: ${[...semReceita].join(', ')}. O estoque não será descontado pra esse(s) item(ns).`;
+  if (semReceitaSet.size) {
+    msg += `\n\nAtenção: não encontrei receita completa pra: ${[...semReceitaSet].join(', ')}. O estoque não será descontado pra esse(s) item(ns).`;
   }
   if (!confirm(msg)) return;
 
@@ -1677,35 +1924,202 @@ async function mergeInsumoNames() {
   }
 }
 
+/* ---------- ITENS DE ESTOQUE (catálogo compartilhado) ---------- */
+function initStockItemsSync() {
+  stockItemsRef.onSnapshot(snapshot => {
+    stockItems = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        nome: data.nome || '',
+        unidade: data.unidade || 'g',
+        limiteAmarelo: typeof data.limiteAmarelo === 'number' ? data.limiteAmarelo : null,
+        limiteVermelho: typeof data.limiteVermelho === 'number' ? data.limiteVermelho : null
+      };
+    });
+    if (activeTab === 'estoque-gestao') { renderStockItemsList(); renderThresholdList(); }
+    if (activeTab === 'estoque-visao') renderStockOverview();
+    Object.keys(itemSelections).forEach(ctx => renderItemSelectedTag(ctx));
+    checkAndLogStockAlerts();
+  }, err => console.error('Erro de sincronização de itens de estoque', err));
+}
+
+function computeNivel(saldo, item) {
+  if (!item || item.limiteAmarelo == null || item.limiteVermelho == null) return null;
+  if (saldo <= item.limiteVermelho) return 'vermelho';
+  if (saldo <= item.limiteAmarelo) return 'amarelo';
+  return 'verde';
+}
+
+function saldoAtualDoItem(nome) {
+  const visibleMoves = stockMoves.filter(m => canSeeOwner(m.donoId) && m.insumo === nome);
+  return visibleMoves.reduce((sum, m) => sum + (m.tipo === 'entrada' ? m.quantidade : -m.quantidade), 0);
+}
+
+function renderThresholdList() {
+  const wrap = document.getElementById('threshold-list');
+  if (!wrap) return;
+  if (!stockItems.length) {
+    wrap.innerHTML = '<div class="empty">Cadastre itens de estoque primeiro.</div>';
+    return;
+  }
+  const sorted = [...stockItems].sort((a,b) => a.nome.localeCompare(b.nome));
+  wrap.innerHTML = sorted.map(i => `
+    <div class="threshold-row">
+      <div class="threshold-row-name">${escapeHtml(i.nome)} <span style="color:#A0917F;font-weight:400;">(${escapeHtml(i.unidade)})</span></div>
+      <div>
+        <label>🟡 Amarelo abaixo de</label>
+        <input type="number" min="0" step="0.01" value="${i.limiteAmarelo != null ? i.limiteAmarelo : ''}"
+               onblur="updateThreshold('${i.id}', 'limiteAmarelo', this.value)" placeholder="Ex: 500">
+      </div>
+      <div>
+        <label>🔴 Vermelho abaixo de</label>
+        <input type="number" min="0" step="0.01" value="${i.limiteVermelho != null ? i.limiteVermelho : ''}"
+               onblur="updateThreshold('${i.id}', 'limiteVermelho', this.value)" placeholder="Ex: 100">
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateThreshold(itemId, campo, value) {
+  const num = value === '' ? null : parseFloat(value);
+  stockItemsRef.doc(itemId).update({ [campo]: num }).catch(err => alert('Erro ao salvar limite: ' + err.message));
+}
+
+function clearStockItemForm() {
+  document.getElementById('si-nome').value = '';
+  document.getElementById('si-unidade').value = 'g';
+}
+
+function submitStockItem() {
+  const nome = document.getElementById('si-nome').value.trim();
+  const unidade = document.getElementById('si-unidade').value;
+  if (!nome) {
+    alert('Preencha o nome do item.');
+    return;
+  }
+  const duplicate = stockItems.find(i => i.nome.toLowerCase() === nome.toLowerCase() && i.id !== editingStockItemId);
+  if (duplicate) {
+    alert('Já existe um item cadastrado com esse nome.');
+    return;
+  }
+
+  if (editingStockItemId) {
+    stockItemsRef.doc(editingStockItemId).update({ nome, unidade })
+      .then(() => cancelEditStockItem())
+      .catch(err => alert('Erro ao salvar: ' + err.message));
+  } else {
+    stockItemsRef.add({ nome, unidade })
+      .then(() => clearStockItemForm())
+      .catch(err => alert('Erro ao salvar: ' + err.message));
+  }
+}
+
+function editStockItem(id) {
+  const item = stockItems.find(i => i.id === id);
+  if (!item) return;
+  editingStockItemId = id;
+  document.getElementById('si-form-title').textContent = 'Editando: ' + item.nome;
+  document.getElementById('si-nome').value = item.nome;
+  document.getElementById('si-unidade').value = item.unidade;
+  document.getElementById('si-submit-btn').textContent = 'Salvar alterações';
+  document.getElementById('si-cancel-btn').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEditStockItem() {
+  editingStockItemId = null;
+  document.getElementById('si-form-title').textContent = 'Novo item de estoque';
+  document.getElementById('si-submit-btn').textContent = 'Salvar item';
+  document.getElementById('si-cancel-btn').style.display = 'none';
+  clearStockItemForm();
+}
+
+function deleteStockItem(id) {
+  if (!confirm('Remover este item cadastrado? Movimentações e receitas que já usam esse nome continuam funcionando normalmente.')) return;
+  stockItemsRef.doc(id).delete();
+  if (editingStockItemId === id) cancelEditStockItem();
+}
+
+function renderStockItemsList() {
+  const wrap = document.getElementById('stock-items-list');
+  if (!stockItems.length) {
+    wrap.innerHTML = '<div class="empty">Nenhum item cadastrado ainda.</div>';
+    return;
+  }
+  const sorted = [...stockItems].sort((a,b) => a.nome.localeCompare(b.nome));
+  wrap.innerHTML = sorted.map(i => `
+    <div class="stock-item">
+      <div class="stock-item-name">${escapeHtml(i.nome)} <span style="color:#A0917F;font-weight:400;">(${escapeHtml(i.unidade)})</span></div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="editStockItem('${i.id}')" style="border:1px solid #E4D9CC;background:#FAF7F2;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;">✏️</button>
+        <button onclick="deleteStockItem('${i.id}')" style="border:1px solid #E4D9CC;background:#FAF7F2;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;color:#B33A3A;">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ---------- BUSCA GENÉRICA DE ITEM DE ESTOQUE (entrada/saída/receitas) ---------- */
+function renderItemDropdown(ctx, query) {
+  const dropdown = document.getElementById(ctx + '-item-dropdown');
+  if (!dropdown) return;
+  const q = (query || '').trim().toLowerCase();
+  const matches = q ? stockItems.filter(i => i.nome.toLowerCase().includes(q)) : stockItems;
+
+  if (!matches.length) {
+    dropdown.innerHTML = `<div class="client-dropdown-empty">${stockItems.length ? 'Nenhum item encontrado.' : 'Nenhum item cadastrado ainda.'} Cadastre em "Itens de estoque".</div>`;
+  } else {
+    dropdown.innerHTML = matches.slice(0, 30).map(i => `
+      <div class="client-dropdown-item" onclick="selectItemFor('${ctx}','${i.id}')">
+        <strong>${escapeHtml(i.nome)}</strong> <span style="color:#A0917F;">(${escapeHtml(i.unidade)})</span>
+      </div>
+    `).join('');
+  }
+  dropdown.classList.add('open');
+}
+
+function selectItemFor(ctx, itemId) {
+  const item = stockItems.find(i => i.id === itemId);
+  if (!item) return;
+  itemSelections[ctx] = { id: item.id, nome: item.nome, unidade: item.unidade };
+  const searchEl = document.getElementById(ctx + '-item-search');
+  if (searchEl) searchEl.value = '';
+  const dropdownEl = document.getElementById(ctx + '-item-dropdown');
+  if (dropdownEl) dropdownEl.classList.remove('open');
+  renderItemSelectedTag(ctx);
+}
+
+function clearItemSelection(ctx) {
+  delete itemSelections[ctx];
+  renderItemSelectedTag(ctx);
+}
+
+function renderItemSelectedTag(ctx) {
+  const wrap = document.getElementById(ctx + '-item-selected');
+  if (!wrap) return;
+  const sel = itemSelections[ctx];
+  wrap.innerHTML = sel
+    ? `<div class="client-selected-tag">📦 ${escapeHtml(sel.nome)} (${escapeHtml(sel.unidade)}) <button onclick="clearItemSelection('${ctx}')">✕</button></div>`
+    : '';
+}
+
+document.addEventListener('click', function(e) {
+  document.querySelectorAll('[id$="-item-dropdown"].open').forEach(dropdown => {
+    const ctx = dropdown.id.replace('-item-dropdown', '');
+    const searchEl = document.getElementById(ctx + '-item-search');
+    if (searchEl && !searchEl.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.remove('open');
+    }
+  });
+});
+
 function renderStock() {
   const visibleMoves = stockMoves.filter(m => canSeeOwner(m.donoId));
-
-  // Datalist de insumos já cadastrados, pra facilitar a saída
   const insumosUnicos = [...new Set(visibleMoves.map(m => m.insumo))].sort();
-  document.getElementById('insumos-list').innerHTML = insumosUnicos.map(i => `<option value="${escapeHtml(i)}">`).join('');
 
   const mergeOptions = insumosUnicos.map(i => `<option value="${escapeHtml(i)}">${escapeHtml(i)}</option>`).join('');
   document.getElementById('merge-de').innerHTML = mergeOptions;
   document.getElementById('merge-para').innerHTML = mergeOptions;
-
-  // Saldo atual por insumo + unidade
-  const saldo = {};
-  visibleMoves.forEach(m => {
-    const key = m.insumo + '||' + m.unidade;
-    if (!saldo[key]) saldo[key] = { insumo: m.insumo, unidade: m.unidade, total: 0 };
-    saldo[key].total += (m.tipo === 'entrada' ? m.quantidade : -m.quantidade);
-  });
-  const saldoList = Object.values(saldo).sort((a,b) => a.insumo.localeCompare(b.insumo));
-
-  const overviewWrap = document.getElementById('stock-overview-list');
-  overviewWrap.innerHTML = saldoList.length
-    ? saldoList.map(s => `
-        <div class="stock-item">
-          <div class="stock-item-name">${escapeHtml(s.insumo)}</div>
-          <div class="stock-item-qty ${s.total <= 0 ? 'low' : ''}">${s.total.toLocaleString('pt-BR')} ${escapeHtml(s.unidade)}</div>
-        </div>
-      `).join('')
-    : '<div class="empty">Nenhuma movimentação registrada ainda.</div>';
 
   // Movimentações recentes (últimas 20)
   const recentes = [...visibleMoves]
@@ -1727,6 +2141,34 @@ function renderStock() {
         </div>
       `).join('')
     : '<div class="empty">Nenhuma movimentação registrada ainda.</div>';
+
+  renderStockItemsList();
+}
+
+function renderStockOverview() {
+  const visibleMoves = stockMoves.filter(m => canSeeOwner(m.donoId));
+
+  const saldo = {};
+  visibleMoves.forEach(m => {
+    const key = m.insumo + '||' + m.unidade;
+    if (!saldo[key]) saldo[key] = { insumo: m.insumo, unidade: m.unidade, total: 0 };
+    saldo[key].total += (m.tipo === 'entrada' ? m.quantidade : -m.quantidade);
+  });
+  const saldoList = Object.values(saldo).sort((a,b) => a.insumo.localeCompare(b.insumo));
+
+  const overviewWrap = document.getElementById('stock-overview-list');
+  overviewWrap.innerHTML = saldoList.length
+    ? saldoList.map(s => {
+        const item = stockItems.find(i => i.nome === s.insumo);
+        const nivel = computeNivel(s.total, item);
+        return `
+        <div class="stock-item ${nivel ? 'nivel-' + nivel : ''}">
+          <div class="stock-item-name">${nivel ? `<span class="nivel-dot ${nivel}"></span>` : ''}${escapeHtml(s.insumo)}</div>
+          <div class="stock-item-qty ${s.total <= 0 ? 'low' : ''}">${s.total.toLocaleString('pt-BR')} ${escapeHtml(s.unidade)}</div>
+        </div>
+      `;
+      }).join('')
+    : '<div class="empty">Nenhuma movimentação registrada ainda.</div>';
 }
 
 /* ---------- AUTENTICAÇÃO ---------- */
@@ -1734,6 +2176,9 @@ function hasAccess(tab) {
   if (!currentAccount) return false;
   if (currentAccount.isAdmin) return true;
   if (tab === 'contas' || tab === 'precificacao') return false;
+  if (tab === 'estoque-gestao' || tab === 'estoque-visao') {
+    return (currentAccount.allowedTabs || []).includes('estoque');
+  }
   return (currentAccount.allowedTabs || []).includes(tab);
 }
 
@@ -1805,15 +2250,19 @@ async function doLogin() {
   document.getElementById('app-root').style.display = 'block';
   applyAccountAccess();
 
-  const firstAllowed = currentAccount.isAdmin
+  let firstAllowed = currentAccount.isAdmin
     ? 'pedidos'
     : (ASSIGNABLE_TABS.map(t => t.key).find(k => (currentAccount.allowedTabs || []).includes(k)) || null);
+  if (firstAllowed === 'estoque') firstAllowed = 'estoque-gestao';
 
   if (firstAllowed) {
     switchTab(firstAllowed);
   } else {
     document.getElementById('current-tab-label').textContent = 'Nenhuma aba liberada — fale com o administrador';
   }
+
+  renderBellBadge();
+  checkAndLogStockAlerts();
 }
 
 function doLogout() {
@@ -1830,9 +2279,10 @@ function applyAccountAccess() {
     el.style.display = hasAccess(tab) ? 'flex' : 'none';
   });
   if (activeTab && !hasAccess(activeTab)) {
-    const firstAllowed = currentAccount.isAdmin
+    let firstAllowed = currentAccount.isAdmin
       ? 'pedidos'
       : (ASSIGNABLE_TABS.map(t => t.key).find(k => (currentAccount.allowedTabs || []).includes(k)) || null);
+    if (firstAllowed === 'estoque') firstAllowed = 'estoque-gestao';
     if (firstAllowed) switchTab(firstAllowed);
   }
 }
@@ -2495,19 +2945,24 @@ function addIngredientRow(ing) {
   }
 
   row.innerHTML = `
-    <input class="ing-nome" type="text" placeholder="Ex: Chocolate meio amargo" value="${escapeHtml(nome)}">
-    <input class="ing-qtd" type="number" min="0" step="0.01" placeholder="Qtd" value="${escapeHtml(String(quantidade))}">
-    <select class="ing-un">
-      <option value="g">g</option>
-      <option value="kg">kg</option>
-      <option value="ml">ml</option>
-      <option value="l">l</option>
-      <option value="un">un</option>
-    </select>
-    <button class="row-remove" onclick="document.getElementById('${id}').remove()">✕</button>
+    <div style="flex:2;">
+      <div class="client-search-wrap">
+        <input id="${id}-item-search" class="ing-search" type="text" placeholder="Buscar item de estoque..." autocomplete="off"
+               oninput="renderItemDropdown('${id}', this.value)" onfocus="renderItemDropdown('${id}', this.value)">
+        <div id="${id}-item-dropdown" class="client-dropdown"></div>
+      </div>
+      <div id="${id}-item-selected"></div>
+    </div>
+    <input class="ing-qtd" type="number" min="0" step="0.01" placeholder="Qtd" value="${escapeHtml(String(quantidade))}" style="flex:1;">
+    <button class="row-remove" onclick="document.getElementById('${id}').remove(); delete itemSelections['${id}'];">✕</button>
   `;
   wrap.appendChild(row);
-  row.querySelector('.ing-un').value = unidade;
+
+  if (nome) {
+    // Pré-seleciona mesmo que o item não esteja (mais) cadastrado no catálogo — mantém compatibilidade
+    itemSelections[id] = { id: null, nome, unidade };
+    renderItemSelectedTag(id);
+  }
 }
 function addStepRow(value) {
   const id = 'step-' + (stepCount++);
@@ -2523,7 +2978,7 @@ function addStepRow(value) {
 }
 function populateRecipeProductSelect() {
   const sel = document.getElementById('r-produto');
-  PRODUCTS.forEach(p => {
+  RECIPE_CATEGORIES.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p;
     opt.textContent = p;
@@ -2535,6 +2990,7 @@ function clearRecipeForm() {
   document.getElementById('r-desc').value = '';
   document.getElementById('r-produto').value = '';
   document.getElementById('r-publicar').checked = false;
+  Object.keys(itemSelections).filter(k => k.startsWith('ing-')).forEach(k => delete itemSelections[k]);
   document.getElementById('r-ingredientes-rows').innerHTML = '';
   document.getElementById('r-passos-rows').innerHTML = '';
   addIngredientRow();
@@ -2570,11 +3026,14 @@ function submitRecipe() {
   const descricao = document.getElementById('r-desc').value.trim();
   const produto = document.getElementById('r-produto').value;
   const publicada = document.getElementById('r-publicar').checked;
-  const ingredientes = Array.from(document.querySelectorAll('#r-ingredientes-rows .ingredient-row')).map(row => ({
-    nome: row.querySelector('.ing-nome').value.trim(),
-    quantidade: parseFloat(row.querySelector('.ing-qtd').value) || 0,
-    unidade: row.querySelector('.ing-un').value
-  })).filter(i => i.nome);
+  const ingredientes = Array.from(document.querySelectorAll('#r-ingredientes-rows .ingredient-row')).map(row => {
+    const sel = itemSelections[row.id];
+    return {
+      nome: sel ? sel.nome : '',
+      quantidade: parseFloat(row.querySelector('.ing-qtd').value) || 0,
+      unidade: sel ? sel.unidade : ''
+    };
+  }).filter(i => i.nome);
   const passos = Array.from(document.querySelectorAll('#r-passos-rows input'))
     .map(i => i.value.trim()).filter(Boolean);
 
@@ -2695,6 +3154,8 @@ function renderRecipesPublicList() {
 initOrdersSync();
 initRecipesSync();
 initStockSync();
+initStockItemsSync();
+initStockAlertsSync();
 initClientsSync();
 initAccountsSync();
 initPricingSync();
