@@ -1,0 +1,2704 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Encomendas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #FAF7F2;
+    margin: 0;
+    padding: 16px;
+    color: #3D2B1F;
+  }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  h1 { font-size: 20px; margin: 0; color: #5C3A21; }
+  .subtitle { font-size: 13px; color: #8A7160; margin-bottom: 16px; }
+  .current-tab {
+    display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700;
+    color: #B5651D; background: #FCEEDD; border-radius: 20px; padding: 6px 12px;
+    width: fit-content; margin-bottom: 16px;
+  }
+  .kebab-btn {
+    border: none; background: white; width: 38px; height: 38px; border-radius: 10px;
+    font-size: 18px; color: #5C3A21; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    flex-shrink: 0;
+  }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .card { background: white; border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .form-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  label { font-size: 12px; font-weight: 600; color: #8A7160; display: block; margin-bottom: 4px; }
+  input, select, textarea {
+    width: 100%; padding: 10px; border: 1px solid #E4D9CC; border-radius: 8px;
+    font-size: 14px; background: #FFFDFB;
+  }
+  textarea { resize: vertical; min-height: 40px; }
+
+  .price-wrap { display: flex; align-items: center; border: 1px solid #E4D9CC; border-radius: 8px; background: #FFFDFB; overflow: hidden; }
+  .price-prefix { padding: 10px 8px 10px 10px; font-size: 14px; font-weight: 700; color: #B5651D; }
+  .price-wrap input { border: none; padding: 10px 10px 10px 0; }
+  .price-wrap input:focus { outline: none; }
+
+  .product-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid #F0E6D8;
+  }
+  .product-row:last-child { border-bottom: none; }
+  .product-name { font-size: 13px; flex: 1; }
+  .qty-control { display: flex; align-items: center; gap: 8px; }
+  .qty-control button {
+    width: 28px; height: 28px; border-radius: 50%; border: 1px solid #E4D9CC;
+    background: #FAF7F2; font-size: 15px; font-weight: 700; color: #B5651D; cursor: pointer; line-height: 1;
+  }
+  .qty-control span { min-width: 18px; text-align: center; font-weight: 700; font-size: 14px; }
+
+  button.primary {
+    background: #B5651D; color: white; border: none; padding: 12px; border-radius: 8px;
+    font-size: 15px; font-weight: 600; width: 100%; margin-top: 4px; cursor: pointer;
+  }
+  button.primary:active { opacity: 0.85; }
+  button.secondary {
+    background: #F0E6D8; color: #8A7160; border: none; padding: 12px; border-radius: 8px;
+    font-size: 14px; font-weight: 600; width: 100%; margin-top: 8px; cursor: pointer;
+  }
+
+  .order {
+    border-left: 4px solid #B5651D; background: white; border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .order.entregue { border-left-color: #6B8F5A; opacity: 0.75; }
+  .order-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .order-client { font-weight: 700; font-size: 15px; }
+  .order-date { font-size: 12px; color: #B5651D; font-weight: 600; white-space: nowrap; }
+  .order-products { font-size: 13px; color: #5C3A21; margin-top: 4px; }
+  .order-delivery { font-size: 12px; color: #8A7160; margin-top: 3px; font-style: italic; }
+  .order-value { font-size: 13px; color: #5C3A21; margin-top: 4px; font-weight: 700; }
+  .order-meta { font-size: 11px; color: #A0917F; margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .order-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .order-actions button {
+    flex: 1; min-width: 100px; padding: 8px; border-radius: 6px;
+    border: 1px solid #E4D9CC; background: #FAF7F2; font-size: 12px; cursor: pointer;
+  }
+  .btn-done { color: #6B8F5A; font-weight: 600; }
+  .btn-pago { color: #B5651D; font-weight: 600; }
+  .btn-del { color: #B33A3A; }
+
+  .empty { text-align: center; color: #A0917F; font-size: 13px; padding: 24px 0; }
+  .section-title {
+    font-size: 13px; font-weight: 700; color: #8A7160; text-transform: uppercase;
+    letter-spacing: 0.03em; margin: 18px 0 8px 4px;
+  }
+  .status { font-size: 10px; padding: 3px 8px; border-radius: 20px; background: #F0E6D8; color: #8A7160; font-weight: 600; }
+  .status.entregue { background: #E4EEDF; color: #567048; }
+  .status.pago { background: #E4EEDF; color: #567048; }
+  .status.naopago { background: #F6E4DE; color: #A0472B; }
+  .status.rascunho { background: #F0E6D8; color: #8A7160; }
+  .status.publicada { background: #E4EEDF; color: #567048; }
+  #loading { text-align: center; padding: 30px; color: #A0917F; }
+
+  /* Calendar */
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-header button {
+    border: none; background: #F0E6D8; color: #B5651D; width: 32px; height: 32px;
+    border-radius: 50%; font-size: 16px; font-weight: 700; cursor: pointer;
+  }
+  .cal-title { font-size: 15px; font-weight: 700; color: #5C3A21; text-transform: capitalize; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-dow { font-size: 10px; font-weight: 700; color: #A0917F; text-align: center; padding-bottom: 4px; }
+  .cal-day {
+    aspect-ratio: 1; border-radius: 8px; background: #FAF7F2; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: 12px; position: relative; cursor: default; color: #C4B7A6;
+  }
+  .cal-day.in-month { color: #5C3A21; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .cal-day.has-orders { cursor: pointer; background: #FCEEDD; border: 1.5px solid #E8B87A; }
+  .cal-day.has-orders:active { background: #F5DDBB; }
+  .cal-day.today { box-shadow: 0 0 0 2px #B5651D inset; }
+  .cal-badge {
+    position: absolute; top: 2px; right: 4px; background: #B5651D; color: white; font-size: 9px;
+    font-weight: 700; border-radius: 20px; min-width: 14px; height: 14px; display: flex;
+    align-items: center; justify-content: center; padding: 0 3px;
+  }
+
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(61,43,31,0.4); z-index: 20;
+    align-items: flex-end; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-sheet {
+    background: #FAF7F2; width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto;
+    border-radius: 18px 18px 0 0; padding: 18px 16px 24px;
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .modal-title { font-size: 15px; font-weight: 700; color: #5C3A21; text-transform: capitalize; }
+  .modal-close { border: none; background: #F0E6D8; color: #8A7160; width: 28px; height: 28px; border-radius: 50%; font-size: 14px; cursor: pointer; }
+
+  /* Vendas */
+  .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .kpi { background: white; border-radius: 12px; padding: 12px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .kpi-value { font-size: 18px; font-weight: 800; color: #B5651D; }
+  .kpi-label { font-size: 11px; color: #8A7160; margin-top: 2px; }
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* Sidebar drawer */
+  .drawer-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(61,43,31,0.4); z-index: 30;
+  }
+  .drawer-overlay.open { display: block; }
+  .drawer {
+    position: fixed; top: 0; right: 0; height: 100%; width: 78%; max-width: 300px;
+    background: #FFFDFB; box-shadow: -2px 0 10px rgba(0,0,0,0.15);
+    transform: translateX(100%); transition: transform 0.25s ease;
+    padding: 20px 16px; overflow-y: auto;
+  }
+  .drawer-overlay.open .drawer { transform: translateX(0); }
+  .drawer-title { font-size: 13px; font-weight: 700; color: #8A7160; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 14px; }
+  .drawer-item {
+    display: flex; align-items: center; gap: 10px; padding: 12px 10px; border-radius: 10px;
+    font-size: 14.5px; font-weight: 600; color: #5C3A21; cursor: pointer; margin-bottom: 4px;
+  }
+  .drawer-item.active { background: #FCEEDD; color: #B5651D; }
+  .drawer-item .emoji { font-size: 17px; }
+
+  /* Recipes */
+  .dynamic-list-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .dynamic-list-row input { flex: 1; }
+  .ingredient-row { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; }
+  .ingredient-row input.ing-nome { flex: 2; }
+  .ingredient-row input.ing-qtd { flex: 1; min-width: 0; }
+  .ingredient-row select.ing-un { flex: 1; min-width: 0; }
+  .row-remove {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid #E4D9CC;
+    background: #FAF7F2; color: #B33A3A; font-size: 14px; cursor: pointer; flex-shrink: 0;
+  }
+  .add-row-btn {
+    background: #F0E6D8; color: #B5651D; border: none; padding: 8px 12px; border-radius: 8px;
+    font-size: 12.5px; font-weight: 600; cursor: pointer; margin-top: 2px;
+  }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; }
+  .checkbox-row input { width: auto; }
+  .checkbox-row label { margin-bottom: 0; }
+
+  .recipe-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .recipe-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .recipe-name { font-weight: 700; font-size: 15px; color: #5C3A21; }
+  .recipe-desc { font-size: 13px; color: #8A7160; margin-top: 4px; }
+  .recipe-sub { font-size: 12px; font-weight: 700; color: #B5651D; margin-top: 10px; margin-bottom: 4px; }
+  .recipe-list { font-size: 13px; color: #3D2B1F; padding-left: 18px; margin: 0; }
+  .recipe-list li { margin-bottom: 3px; }
+  .recipe-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .recipe-actions button {
+    flex: 1; min-width: 90px; padding: 8px; border-radius: 6px;
+    border: 1px solid #E4D9CC; background: #FAF7F2; font-size: 12px; cursor: pointer;
+  }
+
+  /* Estoque */
+  .stock-item {
+    display: flex; justify-content: space-between; align-items: center;
+    background: white; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .stock-item-name { font-weight: 600; font-size: 14px; }
+  .stock-item-qty { font-weight: 800; font-size: 15px; color: #B5651D; }
+  .stock-item-qty.low { color: #B33A3A; }
+
+  .prod-summary-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid #F0E6D8; font-size: 14px;
+  }
+  .prod-summary-item:last-child { border-bottom: none; }
+  .prod-summary-item.total { font-weight: 800; color: #B5651D; border-top: 2px solid #F0E6D8; padding-top: 12px; margin-top: 4px; border-bottom: none; }
+  .prod-summary-qty { font-weight: 700; }
+  .move-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid #F0E6D8; font-size: 12.5px;
+  }
+  .move-row:last-child { border-bottom: none; }
+  .move-tag {
+    font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px;
+  }
+  .move-tag.entrada { background: #E4EEDF; color: #567048; }
+  .move-tag.saida { background: #F6E4DE; color: #A0472B; }
+
+  /* Busca de cliente */
+  .client-search-wrap { position: relative; }
+  .client-dropdown {
+    position: absolute; top: 100%; left: 0; right: 0; background: white;
+    border: 1px solid #E4D9CC; border-radius: 8px; margin-top: 4px; max-height: 180px;
+    overflow-y: auto; z-index: 5; box-shadow: 0 3px 10px rgba(0,0,0,0.1); display: none;
+  }
+  .client-dropdown.open { display: block; }
+  .client-dropdown-item { padding: 10px 12px; font-size: 13.5px; cursor: pointer; border-bottom: 1px solid #F0E6D8; }
+  .client-dropdown-item:last-child { border-bottom: none; }
+  .client-dropdown-item:active { background: #FCEEDD; }
+  .client-dropdown-empty { padding: 10px 12px; font-size: 12.5px; color: #A0917F; }
+  .client-selected-tag {
+    display: inline-flex; align-items: center; gap: 6px; background: #FCEEDD; color: #B5651D;
+    font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 20px; margin-top: 6px;
+  }
+  .client-selected-tag button { border: none; background: none; color: #B5651D; font-weight: 800; cursor: pointer; padding: 0; }
+
+  /* Clientes */
+  .client-card {
+    background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); cursor: pointer;
+  }
+  .client-card-top { display: flex; justify-content: space-between; align-items: center; }
+  .client-name { font-weight: 700; font-size: 15px; color: #5C3A21; }
+  .client-ref { font-size: 12px; color: #8A7160; margin-top: 2px; }
+  .client-badge {
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+    background: #F0E6D8; color: #8A7160; white-space: nowrap;
+  }
+  .client-badge.recorrente { background: #E4EEDF; color: #567048; }
+  .client-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 16px; }
+  .client-detail-title { font-size: 17px; font-weight: 700; color: #5C3A21; margin-bottom: 2px; }
+  .client-detail-ref { font-size: 12.5px; color: #8A7160; margin-bottom: 10px; }
+  .client-detail-obs { font-size: 12.5px; color: #8A7160; background: #FAF7F2; border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
+
+  /* Login */
+  #login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    background: white; border-radius: 18px; padding: 28px 24px; width: 100%; max-width: 340px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1); text-align: center;
+  }
+  .login-card h1 { margin-bottom: 4px; }
+  .login-card .subtitle { margin-bottom: 22px; }
+  .login-card .form-grid { text-align: left; margin-bottom: 6px; }
+  .login-error { color: #B33A3A; font-size: 12.5px; margin: 8px 0 0; min-height: 16px; }
+
+  /* Contas */
+  .account-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .account-card-top { display: flex; justify-content: space-between; align-items: center; }
+  .account-user { font-weight: 700; font-size: 15px; color: #5C3A21; }
+  .tab-checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+  .tab-checklist label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: #5C3A21; margin-bottom: 0; }
+  .tab-checklist input { width: auto; }
+  .tab-checklist.disabled { opacity: 0.4; pointer-events: none; }
+  .logout-item { color: #B33A3A !important; }
+
+  /* Precificação */
+  .pricing-result-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid rgba(181,101,29,0.15); font-size: 13.5px;
+  }
+  .pricing-result-row:last-child { border-bottom: none; }
+  .pricing-result-row.highlight { font-weight: 800; font-size: 16px; color: #B5651D; }
+  .pricing-item-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .pricing-item-row input.pi-nome { flex: 2; }
+  .pricing-item-row input.pi-valor { flex: 1; }
+  .pricing-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+
+  /* Desktop / telas maiores */
+  @media (min-width: 700px) {
+    body { max-width: 760px; margin: 0 auto; padding: 32px 40px 60px; font-size: 16px; }
+    h1 { font-size: 26px; }
+    .subtitle { font-size: 14.5px; margin-bottom: 20px; }
+    .current-tab { font-size: 14px; padding: 8px 16px; }
+    .kebab-btn { width: 44px; height: 44px; font-size: 22px; }
+    .card { padding: 22px 24px; margin-bottom: 18px; border-radius: 16px; }
+    label { font-size: 13.5px; }
+    input, select, textarea { font-size: 15px; padding: 12px 14px; }
+    button.primary { font-size: 16px; padding: 14px; }
+    button.secondary { font-size: 15px; padding: 13px; }
+    .section-title { font-size: 14px; }
+    .order, .recipe-card, .client-card, .stock-item { padding: 16px 18px; }
+    .order-client, .recipe-name, .client-name { font-size: 16.5px; }
+    .order-products, .recipe-desc, .client-ref { font-size: 14px; }
+    .order-actions button, .recipe-actions button { font-size: 13px; padding: 10px; }
+    .kpi-value { font-size: 22px; }
+    .kpi-label { font-size: 12px; }
+    .chart-wrap { height: 280px; }
+    .cal-day { font-size: 14px; }
+    .cal-title { font-size: 17px; }
+    .modal-sheet { max-width: 560px; padding: 26px 28px 30px; }
+    .drawer { max-width: 320px; padding: 26px 20px; }
+    .drawer-item { font-size: 15.5px; padding: 13px 12px; }
+    .product-row, .move-row { font-size: 14.5px; }
+    .tab-btn { font-size: 13.5px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <h1>🍪 Copo de Cookie</h1>
+    <div class="subtitle">Acesso restrito</div>
+    <div class="form-grid">
+      <div>
+        <label>Usuário</label>
+        <input id="login-usuario" type="text" placeholder="Usuário" autocomplete="off">
+      </div>
+      <div>
+        <label>Senha</label>
+        <input id="login-senha" type="password" placeholder="Senha" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="primary" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<div id="app-root" style="display:none">
+
+<div class="topbar">
+  <div>
+    <h1>🍪 Copo de Cookie</h1>
+  </div>
+  <button class="kebab-btn" onclick="openDrawer()">⋮</button>
+</div>
+<div class="subtitle">Pedidos, entregas, vendas e receitas</div>
+<div class="current-tab" id="current-tab-label">📋 Pedidos</div>
+
+<!-- VIEW: PEDIDOS -->
+<div id="view-pedidos" class="view active">
+  <div class="card">
+    <div class="form-grid">
+      <div>
+        <label>Cliente</label>
+        <div class="client-search-wrap">
+          <input id="f-cliente-search" type="text" placeholder="Buscar cliente cadastrado..." autocomplete="off"
+                 oninput="renderClientDropdown('form', this.value)" onfocus="renderClientDropdown('form', this.value)">
+          <div id="f-cliente-dropdown" class="client-dropdown"></div>
+        </div>
+        <div id="f-cliente-selected"></div>
+      </div>
+
+      <div>
+        <label>Produtos</label>
+        <div id="product-rows"></div>
+      </div>
+
+      <div>
+        <label>Valor (R$)</label>
+        <div class="price-wrap">
+          <span class="price-prefix">R$</span>
+          <input id="f-valor" type="number" min="0" step="0.01" placeholder="0,00">
+        </div>
+      </div>
+
+      <div>
+        <label>Modo de entrega</label>
+        <textarea id="f-entrega" placeholder="Ex: retirada na sexta às 18h, entrega no bairro X"></textarea>
+      </div>
+
+      <div>
+        <label>Data do pedido</label>
+        <input id="f-data-pedido" type="date">
+      </div>
+      <div>
+        <label>Data de entrega</label>
+        <input id="f-data-entrega" type="date">
+      </div>
+    </div>
+    <button class="primary" onclick="addOrder()">Adicionar encomenda</button>
+  </div>
+
+  <div id="loading">Carregando encomendas...</div>
+
+  <div id="pendentes-wrap" style="display:none">
+    <div class="section-title">Pendentes</div>
+    <div id="pendentes-list"></div>
+  </div>
+
+  <div id="entregues-wrap" style="display:none">
+    <div class="section-title">Entregues (aguardando pagamento)</div>
+    <div id="entregues-list"></div>
+  </div>
+</div>
+
+<!-- VIEW: HISTORICO -->
+<div id="view-historico" class="view">
+  <div style="font-size:12px;color:#A0917F;margin:0 0 12px 4px;">Pedidos entregues e pagos ficam guardados aqui.</div>
+  <div id="historico-list"></div>
+</div>
+
+<!-- VIEW: ESTOQUE -->
+<div id="view-estoque" class="view">
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Registrar entrada</div>
+    <div class="form-grid">
+      <div>
+        <label>Matéria-prima</label>
+        <input id="se-insumo" type="text" placeholder="Ex: Farinha de trigo">
+      </div>
+      <div>
+        <label>Quantidade</label>
+        <input id="se-quantidade" type="number" min="0" step="0.01" placeholder="0">
+      </div>
+      <div>
+        <label>Unidade</label>
+        <select id="se-unidade">
+          <option value="g">g</option>
+          <option value="kg">kg</option>
+          <option value="ml">ml</option>
+          <option value="l">l</option>
+          <option value="un">unidade</option>
+        </select>
+      </div>
+      <div>
+        <label>Data</label>
+        <input id="se-data" type="date">
+      </div>
+      <div>
+        <label>Observação (opcional)</label>
+        <input id="se-obs" type="text" placeholder="Ex: comprado no atacado">
+      </div>
+    </div>
+    <button class="primary" onclick="addStockMove('entrada')">Registrar entrada</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Registrar saída (utilização)</div>
+    <div class="form-grid">
+      <div>
+        <label>Matéria-prima</label>
+        <input id="ss-insumo" type="text" placeholder="Ex: Farinha de trigo" list="insumos-list">
+        <datalist id="insumos-list"></datalist>
+      </div>
+      <div>
+        <label>Quantidade</label>
+        <input id="ss-quantidade" type="number" min="0" step="0.01" placeholder="0">
+      </div>
+      <div>
+        <label>Unidade</label>
+        <select id="ss-unidade">
+          <option value="g">g</option>
+          <option value="kg">kg</option>
+          <option value="ml">ml</option>
+          <option value="l">l</option>
+          <option value="un">unidade</option>
+        </select>
+      </div>
+      <div>
+        <label>Data</label>
+        <input id="ss-data" type="date">
+      </div>
+      <div>
+        <label>Observação (opcional)</label>
+        <input id="ss-obs" type="text" placeholder="Ex: usado na fornada de sexta">
+      </div>
+    </div>
+    <button class="primary" onclick="addStockMove('saida')">Registrar saída</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Marcar pedidos de um dia como produzidos</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Marca todos os pedidos com entrega nessa data como produzidos de uma vez, descontando o estoque conforme as receitas.</div>
+    <div class="form-grid">
+      <div>
+        <label>Data</label>
+        <input id="bulk-produzido-data" type="date">
+      </div>
+    </div>
+    <button class="primary" onclick="bulkMarkProduzido()">Marcar pedidos desse dia como produzidos</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Zerar estoque</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Leva o saldo de todas as matérias-primas visíveis pra você a zero (lança um ajuste de entrada/saída pra compensar), sem apagar os itens ou o histórico. Use isso pra recontar o estoque do zero.</div>
+    <button class="primary" onclick="zerarEstoque()">Zerar saldo de todas as matérias-primas</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Mesclar nomes duplicados</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Se o mesmo insumo aparece duas vezes com nomes escritos diferente (ex: "açúcar mascavo" e "Açúcar Mascavo"), escolha o nome "de" e o nome "para" — todas as movimentações do primeiro passam a usar o segundo nome.</div>
+    <div class="form-grid">
+      <div>
+        <label>De (nome duplicado)</label>
+        <select id="merge-de"></select>
+      </div>
+      <div>
+        <label>Para (nome que vai ficar)</label>
+        <select id="merge-para"></select>
+      </div>
+    </div>
+    <button class="primary" onclick="mergeInsumoNames()">Mesclar</button>
+  </div>
+
+  <div class="section-title">Estoque atual</div>
+  <div id="stock-overview-list"></div>
+
+  <div class="section-title">Movimentações recentes</div>
+  <div class="card" id="stock-moves-list"></div>
+</div>
+
+<!-- VIEW: CALENDARIO -->
+<div id="view-calendario" class="view">
+  <div class="card">
+    <div class="cal-header">
+      <button onclick="calShift(-1)">‹</button>
+      <div class="cal-title" id="cal-title"></div>
+      <button onclick="calShift(1)">›</button>
+    </div>
+    <div class="cal-grid" id="cal-dow-row"></div>
+    <div class="cal-grid" id="cal-grid" style="margin-top:4px"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Resumo de produção do mês</div>
+    <div style="font-size:11.5px;color:#A0917F;margin:-6px 0 10px;">Soma de todos os pedidos com entrega neste mês, pagos ou não.</div>
+    <div id="cal-production-summary"></div>
+  </div>
+</div>
+
+<!-- VIEW: VENDAS -->
+<div id="view-vendas" class="view">
+  <div class="card">
+    <div class="filter-row">
+      <div>
+        <label>Data de início</label>
+        <input id="v-data-ini" type="date" onchange="renderVendas()">
+      </div>
+      <div>
+        <label>Data de fim</label>
+        <input id="v-data-fim" type="date" onchange="renderVendas()">
+      </div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:#A0917F;margin:-8px 0 14px 4px;">💰 Os dados abaixo consideram apenas pedidos marcados como <strong>pagos</strong>.</div>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-value" id="kpi-qtd">0</div>
+      <div class="kpi-label">Unidades vendidas</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-value" id="kpi-valor">R$ 0,00</div>
+      <div class="kpi-label">Valor total vendido</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Quantidade vendida por dia</div>
+    <div class="chart-wrap"><canvas id="chart-qtd"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Valor vendido por dia</div>
+    <div class="chart-wrap"><canvas id="chart-valor"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Vendas por tipo de produto</div>
+    <div class="chart-wrap"><canvas id="chart-produto"></canvas></div>
+  </div>
+</div>
+
+<!-- VIEW: GERENCIAR RECEITAS -->
+<div id="view-gerenciar-receitas" class="view">
+  <div class="card">
+    <div class="section-title" style="margin-top:0" id="recipe-form-title">Nova receita</div>
+    <div class="form-grid">
+      <div>
+        <label>Nome da receita</label>
+        <input id="r-nome" type="text" placeholder="Ex: Copo de Cookie meio amargo">
+      </div>
+      <div>
+        <label>Descrição</label>
+        <textarea id="r-desc" placeholder="Breve descrição da receita"></textarea>
+      </div>
+
+      <div>
+        <label>Sabor vinculado (pra baixa automática de estoque)</label>
+        <select id="r-produto">
+          <option value="">Nenhum / não vinculada</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Ingredientes (por 1 unidade do produto)</label>
+        <div id="r-ingredientes-rows"></div>
+        <button class="add-row-btn" onclick="addIngredientRow()">+ Adicionar ingrediente</button>
+      </div>
+
+      <div>
+        <label>Modo de preparo (passos)</label>
+        <div id="r-passos-rows"></div>
+        <button class="add-row-btn" onclick="addStepRow()">+ Adicionar passo</button>
+      </div>
+
+      <div class="checkbox-row">
+        <input id="r-publicar" type="checkbox">
+        <label for="r-publicar" style="font-size:13px">Publicar esta receita agora</label>
+      </div>
+    </div>
+    <button class="primary" id="r-submit-btn" onclick="submitRecipe()">Salvar receita</button>
+    <button class="secondary" id="r-cancel-btn" style="display:none" onclick="cancelEditRecipe()">Cancelar edição</button>
+  </div>
+
+  <div class="section-title">Minhas receitas</div>
+  <div id="recipes-manage-list"></div>
+</div>
+
+<!-- VIEW: RECEITAS PUBLICADAS -->
+<div id="view-receitas-publicas" class="view">
+  <div id="recipes-public-list"></div>
+</div>
+
+<!-- VIEW: CADASTRO DE CLIENTES -->
+<div id="view-cadastro-clientes" class="view">
+  <div class="card">
+    <div class="section-title" style="margin-top:0" id="client-form-title">Novo cliente</div>
+    <div class="form-grid">
+      <div>
+        <label>Nome</label>
+        <input id="c-nome" type="text" placeholder="Nome do cliente">
+      </div>
+      <div>
+        <label>Referência (ex: onde trabalha, indicação)</label>
+        <input id="c-referencia" type="text" placeholder="Ex: trabalha na farmácia X, indicado pela Ana">
+      </div>
+      <div>
+        <label>Observações</label>
+        <textarea id="c-observacoes" placeholder="Ex: prefere sabor meio amargo, alérgico a nozes"></textarea>
+      </div>
+    </div>
+    <button class="primary" id="c-submit-btn" onclick="submitClient()">Salvar cliente</button>
+    <button class="secondary" id="c-cancel-btn" style="display:none" onclick="cancelEditClient()">Cancelar edição</button>
+  </div>
+
+  <div class="section-title">Clientes cadastrados</div>
+  <div id="clients-manage-list"></div>
+</div>
+
+<!-- VIEW: ANALISE DE CLIENTES -->
+<div id="view-analise-clientes" class="view">
+  <div style="font-size:12px;color:#A0917F;margin:0 0 12px 4px;">Toque em um cliente pra ver o histórico de compras.</div>
+  <div id="clients-analysis-list"></div>
+</div>
+
+<!-- VIEW: CONTAS -->
+<div id="view-contas" class="view">
+  <div class="card">
+    <div class="section-title" style="margin-top:0" id="account-form-title">Nova conta</div>
+    <div class="form-grid">
+      <div>
+        <label>Usuário</label>
+        <input id="a-usuario" type="text" placeholder="Ex: ederalmeida">
+      </div>
+      <div>
+        <label>Senha</label>
+        <input id="a-senha" type="text" placeholder="Ex: 159753">
+      </div>
+      <div class="checkbox-row">
+        <input id="a-admin" type="checkbox" onchange="toggleAdminChecklist()">
+        <label for="a-admin" style="font-size:13px">Esta conta é administradora (acesso total)</label>
+      </div>
+      <div>
+        <label>Abas liberadas para esse usuário</label>
+        <div class="tab-checklist" id="a-tabs-checklist"></div>
+      </div>
+    </div>
+    <button class="primary" id="a-submit-btn" onclick="submitAccount()">Salvar conta</button>
+    <button class="secondary" id="a-cancel-btn" style="display:none" onclick="cancelEditAccount()">Cancelar edição</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Atribuir pedidos e clientes antigos</div>
+    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Pedidos e clientes cadastrados antes da separação por conta não têm dono. Escolha uma conta abaixo pra atribuir todos eles de uma vez.</div>
+    <div class="form-grid">
+      <div>
+        <label>Atribuir para</label>
+        <select id="orphan-target-account"></select>
+      </div>
+    </div>
+    <button class="primary" onclick="reassignOrphans()">Atribuir pedidos e clientes sem dono</button>
+  </div>
+
+  <div class="section-title">Contas cadastradas</div>
+  <div id="accounts-list"></div>
+</div>
+
+<!-- VIEW: PRECIFICACAO -->
+<div id="view-precificacao" class="view">
+  <div class="card">
+    <div class="section-title" style="margin-top:0" id="pricing-form-title">Novo cálculo</div>
+    <div class="form-grid">
+      <div>
+        <label>Nome do cálculo (ex: sabor ou produto)</label>
+        <input id="pr-nome" type="text" placeholder="Ex: Copo de Cookie ao leite">
+      </div>
+
+      <div>
+        <label>Custos por unidade (R$)</label>
+        <div id="pr-itens-rows"></div>
+        <button class="add-row-btn" onclick="addPricingItemRow()">+ Adicionar custo</button>
+      </div>
+
+      <div>
+        <label>Despesas variáveis (%) — impostos, taxa de cartão, etc.</label>
+        <input id="pr-despesas" type="number" min="0" step="0.1" placeholder="Ex: 10" oninput="renderPricingResult()">
+      </div>
+      <div>
+        <label>Margem de lucro desejada (%)</label>
+        <input id="pr-margem" type="number" min="0" step="0.1" placeholder="Ex: 35" oninput="renderPricingResult()">
+      </div>
+      <div>
+        <label>Preço praticado atualmente (opcional, R$)</label>
+        <input id="pr-preco-atual" type="number" min="0" step="0.01" placeholder="Ex: 12,00" oninput="renderPricingResult()">
+      </div>
+    </div>
+
+    <div class="card" style="background:#FCEEDD;box-shadow:none;margin-top:16px;">
+      <div class="section-title" style="margin-top:0">Resultado</div>
+      <div id="pricing-result"></div>
+    </div>
+
+    <button class="primary" id="pr-submit-btn" onclick="submitPricingProfile()">Salvar cálculo</button>
+    <button class="secondary" id="pr-cancel-btn" style="display:none" onclick="cancelEditPricing()">Cancelar edição</button>
+  </div>
+
+  <div class="section-title">Cálculos salvos</div>
+  <div id="pricing-profiles-list"></div>
+</div>
+
+<!-- DRAWER -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawerBg(event)">
+  <div class="drawer">
+    <div class="drawer-title" id="drawer-title">Menu</div>
+    <div class="drawer-item" data-tab="pedidos" onclick="switchTab('pedidos')"><span class="emoji">📋</span> Pedidos</div>
+    <div class="drawer-item" data-tab="historico" onclick="switchTab('historico')"><span class="emoji">🗂️</span> Histórico</div>
+    <div class="drawer-item" data-tab="calendario" onclick="switchTab('calendario')"><span class="emoji">📅</span> Calendário</div>
+    <div class="drawer-item" data-tab="vendas" onclick="switchTab('vendas')"><span class="emoji">📊</span> Vendas</div>
+    <div class="drawer-item" data-tab="estoque" onclick="switchTab('estoque')"><span class="emoji">📦</span> Estoque</div>
+    <div class="drawer-item" data-tab="gerenciar-receitas" onclick="switchTab('gerenciar-receitas')"><span class="emoji">📝</span> Gerenciar receitas</div>
+    <div class="drawer-item" data-tab="receitas-publicas" onclick="switchTab('receitas-publicas')"><span class="emoji">📖</span> Receitas</div>
+    <div class="drawer-item" data-tab="cadastro-clientes" onclick="switchTab('cadastro-clientes')"><span class="emoji">🧑‍🤝‍🧑</span> Cadastro de clientes</div>
+    <div class="drawer-item" data-tab="analise-clientes" onclick="switchTab('analise-clientes')"><span class="emoji">🔎</span> Análise de clientes</div>
+    <div class="drawer-item" data-tab="contas" id="drawer-item-contas" onclick="switchTab('contas')" style="display:none"><span class="emoji">🔐</span> Contas</div>
+    <div class="drawer-item" data-tab="precificacao" id="drawer-item-precificacao" onclick="switchTab('precificacao')" style="display:none"><span class="emoji">💰</span> Precificação</div>
+    <div class="drawer-item logout-item" onclick="doLogout()" style="margin-top:14px;border-top:1px solid #F0E6D8;padding-top:14px;"><span class="emoji">🚪</span> Sair</div>
+  </div>
+</div>
+
+<!-- MODAL: DIA -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalBg(event)">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Dia</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- MODAL: EDITAR PEDIDO -->
+<div class="modal-overlay" id="edit-order-overlay" onclick="closeEditOrderBg(event)">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Editar pedido</div>
+      <button class="modal-close" onclick="closeEditOrder()">✕</button>
+    </div>
+    <div class="form-grid">
+      <div>
+        <label>Cliente</label>
+        <div class="client-search-wrap">
+          <input id="e-cliente-search" type="text" placeholder="Buscar cliente cadastrado..." autocomplete="off"
+                 oninput="renderClientDropdown('edit', this.value)" onfocus="renderClientDropdown('edit', this.value)">
+          <div id="e-cliente-dropdown" class="client-dropdown"></div>
+        </div>
+        <div id="e-cliente-selected"></div>
+      </div>
+      <div>
+        <label>Produtos</label>
+        <div id="edit-product-rows"></div>
+      </div>
+      <div>
+        <label>Valor (R$)</label>
+        <div class="price-wrap">
+          <span class="price-prefix">R$</span>
+          <input id="e-valor" type="number" min="0" step="0.01">
+        </div>
+      </div>
+      <div>
+        <label>Modo de entrega</label>
+        <textarea id="e-entrega"></textarea>
+      </div>
+      <div>
+        <label>Data do pedido</label>
+        <input id="e-data-pedido" type="date">
+      </div>
+      <div>
+        <label>Data de entrega</label>
+        <input id="e-data-entrega" type="date">
+      </div>
+    </div>
+    <button class="primary" onclick="saveEditOrder()">Salvar alterações</button>
+  </div>
+</div>
+
+<!-- MODAL: ANALISE CLIENTE -->
+<div class="modal-overlay" id="client-analysis-overlay" onclick="closeClientAnalysisBg(event)">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Histórico do cliente</div>
+      <button class="modal-close" onclick="closeClientAnalysis()">✕</button>
+    </div>
+    <div id="client-analysis-body"></div>
+  </div>
+</div>
+
+</div>
+<!-- fim app-root -->
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAf0S_GRUggK4BDi9AtgZiMhU7g96vczVs",
+  authDomain: "cookie-fries.firebaseapp.com",
+  projectId: "cookie-fries",
+  storageBucket: "cookie-fries.firebasestorage.app",
+  messagingSenderId: "901606074413",
+  appId: "1:901606074413:web:123c31693dbb48755530a4"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const ordersRef = db.collection('orders');
+const recipesRef = db.collection('recipes');
+const stockRef = db.collection('stock_moves');
+const clientsRef = db.collection('clients');
+const accountsRef = db.collection('accounts');
+const pricingRef = db.collection('pricing_profiles');
+
+const PRODUCTS = [
+  "Copo de Cookie (ao leite)",
+  "Copo de Cookie (meio amargo)",
+  "Copo de Cookie (Ninho)"
+];
+const PRODUCT_COLORS = ["#B5651D", "#5C3A21", "#D9A441"];
+
+const ASSIGNABLE_TABS = [
+  { key: 'pedidos', label: 'Pedidos' },
+  { key: 'calendario', label: 'Calendário' },
+  { key: 'vendas', label: 'Vendas' },
+  { key: 'historico', label: 'Histórico' },
+  { key: 'estoque', label: 'Estoque' },
+  { key: 'gerenciar-receitas', label: 'Gerenciar receitas' },
+  { key: 'receitas-publicas', label: 'Receitas' },
+  { key: 'cadastro-clientes', label: 'Cadastro de clientes' },
+  { key: 'analise-clientes', label: 'Análise de clientes' }
+];
+const DEFAULT_ADMIN = { usuario: 'ederalmeida', senha: '159753', isAdmin: true, allowedTabs: [] };
+
+let accounts = [];
+let pricingProfiles = [];
+let editingPricingId = null;
+let pricingItemCount = 0;
+let currentAccount = null;
+let editingAccountId = null;
+let accountsSeedChecked = false;
+
+let orders = [];
+let recipes = [];
+let stockMoves = [];
+let clients = [];
+let currentQty = {};
+let calDate = new Date();
+let chartQtd, chartValor, chartProduto;
+let activeTab = 'pedidos';
+let editingRecipeId = null;
+let editingOrderId = null;
+let editCurrentQty = {};
+let editingClientId = null;
+let formSelectedClienteId = null;
+let formSelectedClienteNome = '';
+let editSelectedClienteId = null;
+let editSelectedClienteNome = '';
+let ingredientCount = 0;
+let stepCount = 0;
+
+function todayISO() { return new Date().toISOString().slice(0,10); }
+function fmtDate(iso) {
+  if (!iso) return "-";
+  const [y,m,d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+function fmtMoney(v) {
+  return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+async function sha256Hex(text) {
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* ---------- DRAWER ---------- */
+function openDrawer() {
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('drawer-overlay').classList.remove('open');
+}
+function closeDrawerBg(e) {
+  if (e.target.id === 'drawer-overlay') closeDrawer();
+}
+
+/* ---------- TABS ---------- */
+function switchTab(tab) {
+  if (!hasAccess(tab)) return;
+  activeTab = tab;
+  const labels = {
+    'pedidos': '📋 Pedidos',
+    'calendario': '📅 Calendário',
+    'vendas': '📊 Vendas',
+    'historico': '🗂️ Histórico',
+    'estoque': '📦 Estoque',
+    'gerenciar-receitas': '📝 Gerenciar receitas',
+    'receitas-publicas': '📖 Receitas',
+    'cadastro-clientes': '🧑\u200d🤝\u200d🧑 Cadastro de clientes',
+    'analise-clientes': '🔎 Análise de clientes',
+    'contas': '🔐 Contas',
+    'precificacao': '💰 Precificação'
+  };
+  document.getElementById('current-tab-label').textContent = labels[tab] || tab;
+
+  const tabs = ['pedidos','calendario','vendas','historico','estoque','gerenciar-receitas','receitas-publicas','cadastro-clientes','analise-clientes','contas','precificacao'];
+  tabs.forEach(t => {
+    document.getElementById('view-'+t).classList.toggle('active', t === tab);
+  });
+  document.querySelectorAll('.drawer-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tab);
+  });
+  closeDrawer();
+  if (tab === 'calendario') renderCalendar();
+  if (tab === 'vendas') renderVendas();
+  if (tab === 'historico') renderHistorico();
+  if (tab === 'estoque') renderStock();
+  if (tab === 'gerenciar-receitas') renderRecipesManageList();
+  if (tab === 'receitas-publicas') renderRecipesPublicList();
+  if (tab === 'cadastro-clientes') renderClientsManageList();
+  if (tab === 'analise-clientes') renderClientsAnalysisList();
+  if (tab === 'contas') renderAccountsList();
+  if (tab === 'precificacao') renderPricingProfilesList();
+}
+
+/* ---------- PRODUTOS (form de pedido) ---------- */
+function renderProductRows() {
+  const wrap = document.getElementById('product-rows');
+  wrap.innerHTML = PRODUCTS.map((p, i) => {
+    if (!(p in currentQty)) currentQty[p] = 0;
+    return `
+      <div class="product-row">
+        <div class="product-name">${p}</div>
+        <div class="qty-control">
+          <button onclick="changeQty('${p.replace(/'/g,"\\'")}', -1)">−</button>
+          <span id="qty-${i}">${currentQty[p]}</span>
+          <button onclick="changeQty('${p.replace(/'/g,"\\'")}', 1)">+</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+function changeQty(product, delta) {
+  currentQty[product] = Math.max(0, (currentQty[product] || 0) + delta);
+  renderProductRows();
+}
+
+/* ---------- PEDIDOS: sync ---------- */
+function initOrdersSync() {
+  document.getElementById('f-data-pedido').value = todayISO();
+  renderProductRows();
+
+  ordersRef.onSnapshot(snapshot => {
+    orders = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        clienteId: data.clienteId || null,
+        cliente: data.cliente || '',
+        donoId: data.donoId || null,
+        items: data.items || [],
+        entrega: data.entrega || '',
+        valor: typeof data.valor === 'number' ? data.valor : 0,
+        dataPedido: data.dataPedido || '',
+        dataEntrega: data.dataEntrega || '',
+        status: data.status || 'pendente',
+        pago: !!data.pago,
+        produzido: !!data.produzido
+      };
+    });
+    document.getElementById('loading').style.display = 'none';
+    render();
+    if (activeTab === 'calendario') renderCalendar();
+    if (activeTab === 'vendas') renderVendas();
+    if (activeTab === 'historico') renderHistorico();
+    if (activeTab === 'analise-clientes') renderClientsAnalysisList();
+    refreshOpenModal();
+    refreshOpenClientAnalysis();
+  }, err => {
+    console.error('Erro de sincronização', err);
+    document.getElementById('loading').textContent = 'Erro ao conectar. Verifique sua internet.';
+  });
+}
+
+function addOrder() {
+  const entrega = document.getElementById('f-entrega').value.trim();
+  const valor = parseFloat(document.getElementById('f-valor').value) || 0;
+  const dataPedido = document.getElementById('f-data-pedido').value;
+  const dataEntrega = document.getElementById('f-data-entrega').value;
+
+  const items = PRODUCTS.filter(p => currentQty[p] > 0).map(p => ({ produto: p, quantidade: currentQty[p] }));
+
+  if (!formSelectedClienteId) {
+    alert('Selecione um cliente cadastrado na busca. Se ele ainda não existe, cadastre primeiro na aba "Cadastro de clientes".');
+    return;
+  }
+  if (items.length === 0 || !dataEntrega) {
+    alert('Preencha ao menos 1 produto e a data de entrega.');
+    return;
+  }
+
+  ordersRef.add({
+    clienteId: formSelectedClienteId, cliente: formSelectedClienteNome,
+    donoId: currentAccount.id,
+    items, entrega, valor, dataPedido, dataEntrega,
+    status: 'pendente', pago: false, produzido: false
+  }).catch(err => alert('Erro ao salvar: ' + err.message));
+
+  clearClientSelection('form');
+  document.getElementById('f-entrega').value = '';
+  document.getElementById('f-valor').value = '';
+  document.getElementById('f-data-entrega').value = '';
+  document.getElementById('f-data-pedido').value = todayISO();
+  currentQty = {};
+  renderProductRows();
+}
+
+function toggleStatus(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  ordersRef.doc(id).update({ status: o.status === 'pendente' ? 'entregue' : 'pendente' });
+}
+function togglePago(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  ordersRef.doc(id).update({ pago: !o.pago });
+}
+
+function findRecipeForProduct(produto) {
+  return recipes.find(r => r.produto === produto);
+}
+
+async function toggleProduzido(id) {
+  if (!hasAccess('estoque')) {
+    alert('Você não tem permissão de acesso à aba Estoque, então não pode marcar produção (isso afeta o estoque).');
+    return;
+  }
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  const novoValor = !o.produzido;
+
+  const semReceita = [];
+  const movimentos = []; // { insumo, quantidade, unidade }
+
+  o.items.forEach(item => {
+    const receita = findRecipeForProduct(item.produto);
+    if (!receita || !receita.ingredientes.length) {
+      semReceita.push(item.produto);
+      return;
+    }
+    receita.ingredientes.forEach(ing => {
+      if (typeof ing === 'string' || !ing.nome || !ing.quantidade) return;
+      movimentos.push({
+        insumo: ing.nome,
+        quantidade: ing.quantidade * item.quantidade,
+        unidade: ing.unidade || ''
+      });
+    });
+  });
+
+  if (semReceita.length && !confirm(
+    `Não encontrei receita com ingredientes cadastrados pra: ${semReceita.join(', ')}. O estoque não será descontado pra esse(s) item(ns). Continuar mesmo assim?`
+  )) {
+    return;
+  }
+
+  try {
+    const batch = db.batch();
+    batch.update(ordersRef.doc(id), { produzido: novoValor });
+
+    movimentos.forEach(m => {
+      const moveRef = stockRef.doc();
+      batch.set(moveRef, {
+        tipo: novoValor ? 'saida' : 'entrada',
+        insumo: m.insumo,
+        quantidade: m.quantidade,
+        unidade: m.unidade,
+        data: todayISO(),
+        obs: novoValor
+          ? `Baixa automática — produção do pedido de ${o.cliente}`
+          : `Estorno automático — produção desfeita do pedido de ${o.cliente}`,
+        donoId: currentAccount.id
+      });
+    });
+
+    await batch.commit();
+  } catch (err) {
+    alert('Erro ao atualizar produção: ' + err.message);
+  }
+}
+
+function deleteOrder(id) {
+  if (!confirm('Remover esta encomenda?')) return;
+  ordersRef.doc(id).delete();
+}
+
+function itemsSummary(items) {
+  return (items || []).map(it => `${it.quantidade}× ${it.produto}`).join(' · ');
+}
+
+function safeOrderHTML(o) {
+  try {
+    return orderHTML(o);
+  } catch (e) {
+    console.error('Erro ao renderizar pedido', o && o.id, e);
+    return `<div class="order" style="border-left-color:#B33A3A;">
+      <div style="color:#B33A3A;font-size:12.5px;font-weight:600;">⚠️ Não foi possível exibir este pedido</div>
+      <div style="font-size:11.5px;color:#A0917F;margin-top:4px;">ID: ${escapeHtml((o && o.id) || '?')} — Erro: ${escapeHtml(e.message)}</div>
+    </div>`;
+  }
+}
+
+function render() {
+  const pendentes = orders.filter(o => o.status === 'pendente' && canSeeOwner(o.donoId))
+    .sort((a,b) => (a.dataEntrega || '').localeCompare(b.dataEntrega || ''));
+  const aguardandoPagamento = orders.filter(o => o.status === 'entregue' && !o.pago && canSeeOwner(o.donoId))
+    .sort((a,b) => (b.dataEntrega || '').localeCompare(a.dataEntrega || ''));
+
+  document.getElementById('pendentes-wrap').style.display = 'block';
+  document.getElementById('entregues-wrap').style.display = aguardandoPagamento.length ? 'block' : 'none';
+
+  document.getElementById('pendentes-list').innerHTML = pendentes.length
+    ? pendentes.map(safeOrderHTML).join('')
+    : '<div class="empty">Nenhuma encomenda pendente.</div>';
+  document.getElementById('entregues-list').innerHTML = aguardandoPagamento.map(safeOrderHTML).join('');
+}
+
+function renderHistorico() {
+  const finalizados = orders.filter(o => o.status === 'entregue' && o.pago && canSeeOwner(o.donoId))
+    .sort((a,b) => (b.dataEntrega || '').localeCompare(a.dataEntrega || ''));
+  document.getElementById('historico-list').innerHTML = finalizados.length
+    ? finalizados.map(safeOrderHTML).join('')
+    : '<div class="empty">Nenhum pedido finalizado ainda.</div>';
+}
+
+function orderHTML(o) {
+  const isDone = o.status === 'entregue';
+  const isPago = !!o.pago;
+  const isProduzido = !!o.produzido;
+  return `
+    <div class="order ${isDone ? 'entregue' : ''}">
+      <div class="order-top">
+        <div class="order-client">${escapeHtml(o.cliente)}</div>
+        <div class="order-date">${fmtDate(o.dataEntrega)}</div>
+      </div>
+      <div class="order-products">${escapeHtml(itemsSummary(o.items))}</div>
+      ${o.valor ? `<div class="order-value">${fmtMoney(o.valor)}</div>` : ''}
+      ${o.entrega ? `<div class="order-delivery">🚚 ${escapeHtml(o.entrega)}</div>` : ''}
+      <div class="order-meta">
+        Pedido em ${fmtDate(o.dataPedido)}
+        <span class="status ${isDone ? 'entregue' : ''}">${isDone ? 'Entregue' : 'Pendente'}</span>
+        <span class="status ${isPago ? 'pago' : 'naopago'}">${isPago ? 'Pago' : 'Não pago'}</span>
+        <span class="status ${isProduzido ? 'pago' : 'naopago'}">${isProduzido ? 'Produzido' : 'Não produzido'}</span>
+      </div>
+      <div class="order-actions">
+        <button onclick="openEditOrder('${o.id}')">✏️ Editar</button>
+        <button class="btn-done" onclick="toggleStatus('${o.id}')">${isDone ? '↩ Reabrir' : '✓ Marcar entregue'}</button>
+        <button class="btn-pago" onclick="togglePago('${o.id}')">${isPago ? '↩ Desmarcar pago' : '💰 Marcar como pago'}</button>
+        ${hasAccess('estoque') ? `<button onclick="toggleProduzido('${o.id}')">${isProduzido ? '↩ Desmarcar produzido' : '🏭 Marcar como produzido'}</button>` : ''}
+        <button class="btn-del" onclick="deleteOrder('${o.id}')">🗑 Remover</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- EDITAR PEDIDO ---------- */
+function openEditOrder(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  editingOrderId = id;
+  editCurrentQty = {};
+  PRODUCTS.forEach(p => editCurrentQty[p] = 0);
+  o.items.forEach(it => { editCurrentQty[it.produto] = it.quantidade; });
+
+  editSelectedClienteId = o.clienteId || null;
+  editSelectedClienteNome = o.cliente || '';
+  document.getElementById('e-cliente-search').value = '';
+  renderSelectedClientTag('edit');
+
+  document.getElementById('e-valor').value = o.valor || '';
+  document.getElementById('e-entrega').value = o.entrega || '';
+  document.getElementById('e-data-pedido').value = o.dataPedido || '';
+  document.getElementById('e-data-entrega').value = o.dataEntrega || '';
+  renderEditProductRows();
+
+  document.getElementById('edit-order-overlay').classList.add('open');
+}
+
+function renderEditProductRows() {
+  const wrap = document.getElementById('edit-product-rows');
+  wrap.innerHTML = PRODUCTS.map((p, i) => `
+    <div class="product-row">
+      <div class="product-name">${p}</div>
+      <div class="qty-control">
+        <button onclick="editChangeQty('${p.replace(/'/g,"\\'")}', -1)">−</button>
+        <span id="e-qty-${i}">${editCurrentQty[p]}</span>
+        <button onclick="editChangeQty('${p.replace(/'/g,"\\'")}', 1)">+</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function editChangeQty(product, delta) {
+  editCurrentQty[product] = Math.max(0, (editCurrentQty[product] || 0) + delta);
+  renderEditProductRows();
+}
+
+function saveEditOrder() {
+  if (!editingOrderId) return;
+  const entrega = document.getElementById('e-entrega').value.trim();
+  const valor = parseFloat(document.getElementById('e-valor').value) || 0;
+  const dataPedido = document.getElementById('e-data-pedido').value;
+  const dataEntrega = document.getElementById('e-data-entrega').value;
+  const items = PRODUCTS.filter(p => editCurrentQty[p] > 0).map(p => ({ produto: p, quantidade: editCurrentQty[p] }));
+
+  if (!editSelectedClienteNome) {
+    alert('Selecione um cliente cadastrado na busca.');
+    return;
+  }
+  if (items.length === 0 || !dataEntrega) {
+    alert('Preencha ao menos 1 produto e a data de entrega.');
+    return;
+  }
+
+  ordersRef.doc(editingOrderId).update({
+    clienteId: editSelectedClienteId, cliente: editSelectedClienteNome,
+    entrega, valor, dataPedido, dataEntrega, items
+  })
+    .then(() => closeEditOrder())
+    .catch(err => alert('Erro ao salvar: ' + err.message));
+}
+
+function closeEditOrder() {
+  document.getElementById('edit-order-overlay').classList.remove('open');
+  editingOrderId = null;
+}
+function closeEditOrderBg(e) {
+  if (e.target.id === 'edit-order-overlay') closeEditOrder();
+}
+
+/* ---------- CALENDAR ---------- */
+const DOW = ['D','S','T','Q','Q','S','S'];
+const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+let currentModalDay = null;
+
+function calShift(delta) {
+  calDate = new Date(calDate.getFullYear(), calDate.getMonth() + delta, 1);
+  renderCalendar();
+}
+function ordersByDate(iso) {
+  return orders.filter(o => o.dataEntrega === iso && canSeeOwner(o.donoId));
+}
+function renderCalendar() {
+  const year = calDate.getFullYear();
+  const month = calDate.getMonth();
+  document.getElementById('cal-title').textContent = `${MONTHS[month]} de ${year}`;
+  document.getElementById('cal-dow-row').innerHTML = DOW.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = todayISO();
+
+  let cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  document.getElementById('cal-grid').innerHTML = cells.map(d => {
+    if (!d) return `<div class="cal-day"></div>`;
+    const iso = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayOrders = ordersByDate(iso);
+    const isToday = iso === todayStr;
+    const classes = ['cal-day', 'in-month'];
+    if (dayOrders.length) classes.push('has-orders');
+    if (isToday) classes.push('today');
+    const badge = dayOrders.length ? `<div class="cal-badge">${dayOrders.length}</div>` : '';
+    const onclick = dayOrders.length ? `onclick="openDay('${iso}')"` : '';
+    return `<div class="${classes.join(' ')}" ${onclick}>${d}${badge}</div>`;
+  }).join('');
+
+  renderCalProductionSummary(year, month);
+}
+
+function renderCalProductionSummary(year, month) {
+  const monthPrefix = `${year}-${String(month+1).padStart(2,'0')}`;
+  const monthOrders = orders.filter(o => (o.dataEntrega || '').startsWith(monthPrefix) && canSeeOwner(o.donoId));
+
+  const byProduct = {};
+  PRODUCTS.forEach(p => byProduct[p] = 0);
+  let total = 0;
+  monthOrders.forEach(o => o.items.forEach(it => {
+    byProduct[it.produto] = (byProduct[it.produto] || 0) + it.quantidade;
+    total += it.quantidade;
+  }));
+
+  const wrap = document.getElementById('cal-production-summary');
+  if (!total) {
+    wrap.innerHTML = '<div class="empty">Nenhum pedido com entrega neste mês.</div>';
+    return;
+  }
+  wrap.innerHTML = PRODUCTS.map(p => `
+    <div class="prod-summary-item">
+      <div>${p}</div>
+      <div class="prod-summary-qty">${byProduct[p]} un</div>
+    </div>
+  `).join('') + `
+    <div class="prod-summary-item total">
+      <div>Total a produzir</div>
+      <div class="prod-summary-qty">${total} un</div>
+    </div>
+  `;
+}
+function dayProductionSummaryHTML(dayOrders) {
+  const byProduct = {};
+  PRODUCTS.forEach(p => byProduct[p] = 0);
+  let total = 0;
+  dayOrders.forEach(o => (o.items || []).forEach(it => {
+    byProduct[it.produto] = (byProduct[it.produto] || 0) + it.quantidade;
+    total += it.quantidade;
+  }));
+  if (!total) return '';
+  return `
+    <div class="card" style="background:#FCEEDD;box-shadow:none;padding:12px 14px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:#B5651D;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:6px;">Resumo pra produzir nesse dia</div>
+      ${PRODUCTS.map(p => `
+        <div class="prod-summary-item" style="padding:6px 0;">
+          <div style="font-size:13px;">${p}</div>
+          <div class="prod-summary-qty">${byProduct[p]} un</div>
+        </div>
+      `).join('')}
+      <div class="prod-summary-item total" style="padding-top:8px;margin-top:2px;">
+        <div>Total</div>
+        <div class="prod-summary-qty">${total} un</div>
+      </div>
+    </div>
+  `;
+}
+
+function openDay(iso) {
+  currentModalDay = iso;
+  const dayOrders = ordersByDate(iso);
+  const [y,m,d] = iso.split('-');
+  document.getElementById('modal-title').textContent = `${d} de ${MONTHS[parseInt(m)-1]} — ${dayOrders.length} pedido(s)`;
+  document.getElementById('modal-body').innerHTML = dayProductionSummaryHTML(dayOrders) + dayOrders.map(safeOrderHTML).join('');
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function refreshOpenModal() {
+  if (currentModalDay && document.getElementById('modal-overlay').classList.contains('open')) {
+    const dayOrders = ordersByDate(currentModalDay);
+    if (!dayOrders.length) { closeModal(); renderCalendar(); return; }
+    document.getElementById('modal-body').innerHTML = dayProductionSummaryHTML(dayOrders) + dayOrders.map(safeOrderHTML).join('');
+  }
+  renderCalendar();
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  currentModalDay = null;
+}
+function closeModalBg(e) {
+  if (e.target.id === 'modal-overlay') closeModal();
+}
+
+/* ---------- VENDAS ---------- */
+function defaultDateRange() {
+  if (!orders.length) {
+    const end = todayISO();
+    return [end, end];
+  }
+  const dates = orders.map(o => o.dataPedido).filter(Boolean).sort();
+  return [dates[0], todayISO()];
+}
+function renderVendas() {
+  const iniEl = document.getElementById('v-data-ini');
+  const fimEl = document.getElementById('v-data-fim');
+  if (!iniEl.value || !fimEl.value) {
+    const [ini, fim] = defaultDateRange();
+    iniEl.value = ini;
+    fimEl.value = fim;
+  }
+  const ini = iniEl.value;
+  const fim = fimEl.value;
+
+  const filtered = orders.filter(o => o.dataPedido && o.dataPedido >= ini && o.dataPedido <= fim && o.pago);
+
+  let totalQtd = 0, totalValor = 0;
+  filtered.forEach(o => {
+    o.items.forEach(it => totalQtd += it.quantidade);
+    totalValor += (o.valor || 0);
+  });
+  document.getElementById('kpi-qtd').textContent = totalQtd;
+  document.getElementById('kpi-valor').textContent = fmtMoney(totalValor);
+
+  const byDayQtd = {};
+  const byDayValor = {};
+  filtered.forEach(o => {
+    const day = o.dataPedido;
+    if (!byDayQtd[day]) byDayQtd[day] = 0;
+    if (!byDayValor[day]) byDayValor[day] = 0;
+    o.items.forEach(it => byDayQtd[day] += it.quantidade);
+    byDayValor[day] += (o.valor || 0);
+  });
+  const days = Object.keys(byDayQtd).sort();
+  const qtdData = days.map(d => byDayQtd[d]);
+  const valorData = days.map(d => byDayValor[d]);
+  const dayLabels = days.map(fmtDate);
+
+  const byProduct = {};
+  PRODUCTS.forEach(p => byProduct[p] = 0);
+  filtered.forEach(o => o.items.forEach(it => { byProduct[it.produto] = (byProduct[it.produto] || 0) + it.quantidade; }));
+
+  renderChart('chart-qtd', 'bar', dayLabels, [{ label: 'Unidades', data: qtdData, backgroundColor: '#B5651D' }], 'qtd');
+  renderChart('chart-valor', 'bar', dayLabels, [{ label: 'Valor (R$)', data: valorData, backgroundColor: '#5C3A21' }], 'valor');
+  renderChart('chart-produto', 'doughnut', PRODUCTS.map(p => p.replace('Copo de Cookie ','')), [{ data: PRODUCTS.map(p => byProduct[p]), backgroundColor: PRODUCT_COLORS }], 'produto');
+}
+function renderChart(canvasId, type, labels, datasets, key) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  const existing = { qtd: chartQtd, valor: chartValor, produto: chartProduto }[key];
+  if (existing) existing.destroy();
+  const opts = {
+    type,
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: type === 'doughnut' } },
+      scales: type === 'doughnut' ? {} : { y: { beginAtZero: true } }
+    }
+  };
+  const chart = new Chart(ctx, opts);
+  if (key === 'qtd') chartQtd = chart;
+  if (key === 'valor') chartValor = chart;
+  if (key === 'produto') chartProduto = chart;
+}
+
+/* ---------- ESTOQUE ---------- */
+function initStockSync() {
+  document.getElementById('se-data').value = todayISO();
+  document.getElementById('ss-data').value = todayISO();
+  const ontem = new Date();
+  ontem.setDate(ontem.getDate() - 1);
+  document.getElementById('bulk-produzido-data').value = ontem.toISOString().slice(0,10);
+
+  stockRef.onSnapshot(snapshot => {
+    stockMoves = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        tipo: data.tipo || 'entrada',
+        insumo: data.insumo || '',
+        quantidade: typeof data.quantidade === 'number' ? data.quantidade : 0,
+        unidade: data.unidade || '',
+        data: data.data || '',
+        obs: data.obs || '',
+        donoId: data.donoId || null
+      };
+    });
+    if (activeTab === 'estoque') renderStock();
+  }, err => console.error('Erro de sincronização de estoque', err));
+}
+
+function addStockMove(tipo) {
+  const prefix = tipo === 'entrada' ? 'se' : 'ss';
+  const insumo = document.getElementById(prefix + '-insumo').value.trim();
+  const quantidade = parseFloat(document.getElementById(prefix + '-quantidade').value);
+  const unidade = document.getElementById(prefix + '-unidade').value;
+  const data = document.getElementById(prefix + '-data').value;
+  const obs = document.getElementById(prefix + '-obs').value.trim();
+
+  if (!insumo || !quantidade || quantidade <= 0 || !data) {
+    alert('Preencha matéria-prima, quantidade (maior que zero) e data.');
+    return;
+  }
+
+  stockRef.add({ tipo, insumo, quantidade, unidade, data, obs, donoId: currentAccount.id })
+    .catch(err => alert('Erro ao salvar: ' + err.message));
+
+  document.getElementById(prefix + '-insumo').value = '';
+  document.getElementById(prefix + '-quantidade').value = '';
+  document.getElementById(prefix + '-obs').value = '';
+  document.getElementById(prefix + '-data').value = todayISO();
+}
+
+function deleteStockMove(id) {
+  if (!confirm('Remover esta movimentação?')) return;
+  stockRef.doc(id).delete();
+}
+
+/* ---------- FERRAMENTAS EM LOTE DE ESTOQUE ---------- */
+
+async function bulkMarkProduzido() {
+  if (!hasAccess('estoque')) {
+    alert('Você não tem permissão de acesso à aba Estoque.');
+    return;
+  }
+  const data = document.getElementById('bulk-produzido-data').value;
+  if (!data) {
+    alert('Escolha uma data.');
+    return;
+  }
+
+  const alvo = orders.filter(o => o.dataEntrega === data && canSeeOwner(o.donoId) && !o.produzido);
+  if (!alvo.length) {
+    alert('Não há pedidos não-produzidos com entrega nessa data.');
+    return;
+  }
+
+  const semReceita = new Set();
+  const movimentos = [];
+
+  alvo.forEach(o => {
+    o.items.forEach(item => {
+      const receita = findRecipeForProduct(item.produto);
+      if (!receita || !receita.ingredientes.length) {
+        semReceita.add(item.produto);
+        return;
+      }
+      receita.ingredientes.forEach(ing => {
+        if (typeof ing === 'string' || !ing.nome || !ing.quantidade) return;
+        movimentos.push({ insumo: ing.nome, quantidade: ing.quantidade * item.quantidade, unidade: ing.unidade || '' });
+      });
+    });
+  });
+
+  let msg = `Marcar ${alvo.length} pedido(s) do dia ${fmtDate(data)} como produzidos e descontar o estoque?`;
+  if (semReceita.size) {
+    msg += `\n\nAtenção: não encontrei receita completa pra: ${[...semReceita].join(', ')}. O estoque não será descontado pra esse(s) item(ns).`;
+  }
+  if (!confirm(msg)) return;
+
+  try {
+    const batch = db.batch();
+    alvo.forEach(o => batch.update(ordersRef.doc(o.id), { produzido: true }));
+    movimentos.forEach(m => {
+      const moveRef = stockRef.doc();
+      batch.set(moveRef, {
+        tipo: 'saida', insumo: m.insumo, quantidade: m.quantidade, unidade: m.unidade,
+        data: todayISO(), obs: `Baixa automática em lote — produção do dia ${fmtDate(data)}`,
+        donoId: currentAccount.id
+      });
+    });
+    await batch.commit();
+    alert('Pronto! Pedidos marcados como produzidos e estoque atualizado.');
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+}
+
+async function zerarEstoque() {
+  const visibleMoves = stockMoves.filter(m => canSeeOwner(m.donoId));
+  const saldo = {};
+  visibleMoves.forEach(m => {
+    const key = m.insumo + '||' + m.unidade;
+    if (!saldo[key]) saldo[key] = { insumo: m.insumo, unidade: m.unidade, total: 0 };
+    saldo[key].total += (m.tipo === 'entrada' ? m.quantidade : -m.quantidade);
+  });
+  const itensParaZerar = Object.values(saldo).filter(s => s.total !== 0);
+
+  if (!itensParaZerar.length) {
+    alert('O estoque já está zerado.');
+    return;
+  }
+  if (!confirm(`Isso vai lançar um ajuste em ${itensParaZerar.length} matéria(s)-prima(s) pra deixar o saldo de cada uma em 0, mantendo os itens cadastrados e o histórico. Confirma?`)) return;
+
+  try {
+    const batch = db.batch();
+    itensParaZerar.forEach(item => {
+      const moveRef = stockRef.doc();
+      batch.set(moveRef, {
+        tipo: item.total > 0 ? 'saida' : 'entrada',
+        insumo: item.insumo,
+        quantidade: Math.abs(item.total),
+        unidade: item.unidade,
+        data: todayISO(),
+        obs: 'Ajuste de zeragem — recontagem de estoque',
+        donoId: currentAccount.id
+      });
+    });
+    await batch.commit();
+    alert('Estoque zerado! Agora é só lançar as entradas com as quantidades reais.');
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+}
+
+async function mergeInsumoNames() {
+  const de = document.getElementById('merge-de').value;
+  const para = document.getElementById('merge-para').value;
+  if (!de || !para) {
+    alert('Escolha os dois nomes.');
+    return;
+  }
+  if (de === para) {
+    alert('Escolha nomes diferentes.');
+    return;
+  }
+  const afetados = stockMoves.filter(m => m.insumo === de && canSeeOwner(m.donoId));
+  if (!afetados.length) {
+    alert('Não encontrei movimentações com esse nome.');
+    return;
+  }
+  if (!confirm(`Renomear ${afetados.length} movimentação(ões) de "${de}" para "${para}"?`)) return;
+
+  try {
+    const batch = db.batch();
+    afetados.forEach(m => batch.update(stockRef.doc(m.id), { insumo: para }));
+    await batch.commit();
+    alert('Mesclado com sucesso!');
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+}
+
+function renderStock() {
+  const visibleMoves = stockMoves.filter(m => canSeeOwner(m.donoId));
+
+  // Datalist de insumos já cadastrados, pra facilitar a saída
+  const insumosUnicos = [...new Set(visibleMoves.map(m => m.insumo))].sort();
+  document.getElementById('insumos-list').innerHTML = insumosUnicos.map(i => `<option value="${escapeHtml(i)}">`).join('');
+
+  const mergeOptions = insumosUnicos.map(i => `<option value="${escapeHtml(i)}">${escapeHtml(i)}</option>`).join('');
+  document.getElementById('merge-de').innerHTML = mergeOptions;
+  document.getElementById('merge-para').innerHTML = mergeOptions;
+
+  // Saldo atual por insumo + unidade
+  const saldo = {};
+  visibleMoves.forEach(m => {
+    const key = m.insumo + '||' + m.unidade;
+    if (!saldo[key]) saldo[key] = { insumo: m.insumo, unidade: m.unidade, total: 0 };
+    saldo[key].total += (m.tipo === 'entrada' ? m.quantidade : -m.quantidade);
+  });
+  const saldoList = Object.values(saldo).sort((a,b) => a.insumo.localeCompare(b.insumo));
+
+  const overviewWrap = document.getElementById('stock-overview-list');
+  overviewWrap.innerHTML = saldoList.length
+    ? saldoList.map(s => `
+        <div class="stock-item">
+          <div class="stock-item-name">${escapeHtml(s.insumo)}</div>
+          <div class="stock-item-qty ${s.total <= 0 ? 'low' : ''}">${s.total.toLocaleString('pt-BR')} ${escapeHtml(s.unidade)}</div>
+        </div>
+      `).join('')
+    : '<div class="empty">Nenhuma movimentação registrada ainda.</div>';
+
+  // Movimentações recentes (últimas 20)
+  const recentes = [...visibleMoves]
+    .sort((a,b) => (b.data || '').localeCompare(a.data || ''))
+    .slice(0, 20);
+  const movesWrap = document.getElementById('stock-moves-list');
+  movesWrap.innerHTML = recentes.length
+    ? recentes.map(m => `
+        <div class="move-row">
+          <div>
+            <span class="move-tag ${m.tipo}">${m.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span>
+            ${escapeHtml(m.insumo)} — ${m.quantidade.toLocaleString('pt-BR')} ${escapeHtml(m.unidade)}
+            ${m.obs ? `<br><span style="color:#A0917F;font-size:11px;">${escapeHtml(m.obs)}</span>` : ''}
+          </div>
+          <div style="text-align:right;white-space:nowrap;">
+            ${fmtDate(m.data)}<br>
+            <a href="#" style="color:#B33A3A;font-size:11px;" onclick="event.preventDefault();deleteStockMove('${m.id}')">remover</a>
+          </div>
+        </div>
+      `).join('')
+    : '<div class="empty">Nenhuma movimentação registrada ainda.</div>';
+}
+
+/* ---------- AUTENTICAÇÃO ---------- */
+function hasAccess(tab) {
+  if (!currentAccount) return false;
+  if (currentAccount.isAdmin) return true;
+  if (tab === 'contas' || tab === 'precificacao') return false;
+  return (currentAccount.allowedTabs || []).includes(tab);
+}
+
+function canSeeOwner(donoId) {
+  if (!currentAccount) return false;
+  return currentAccount.isAdmin || !donoId || donoId === currentAccount.id;
+}
+
+function initAccountsSync() {
+  accountsRef.onSnapshot(snapshot => {
+    accounts = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        usuario: data.usuario || '',
+        senha: data.senha || '',
+        isAdmin: !!data.isAdmin,
+        allowedTabs: data.allowedTabs || []
+      };
+    });
+
+    if (!accountsSeedChecked) {
+      accountsSeedChecked = true;
+      if (accounts.length === 0) {
+        sha256Hex(DEFAULT_ADMIN.senha).then(hash => {
+          accountsRef.add({ usuario: DEFAULT_ADMIN.usuario, senha: hash, isAdmin: true, allowedTabs: [] })
+            .catch(err => console.error('Erro ao criar admin padrão', err));
+        });
+      }
+    }
+
+    if (activeTab === 'contas') renderAccountsList();
+
+    // Mantém a sessão sincronizada caso a própria conta logada seja editada
+    if (currentAccount) {
+      const updated = accounts.find(a => a.id === currentAccount.id);
+      if (updated) {
+        currentAccount = updated;
+        applyAccountAccess();
+      } else {
+        doLogout();
+      }
+    }
+  }, err => console.error('Erro de sincronização de contas', err));
+}
+
+async function doLogin() {
+  const usuario = document.getElementById('login-usuario').value.trim();
+  const senha = document.getElementById('login-senha').value.trim();
+  const errorEl = document.getElementById('login-error');
+
+  if (!usuario || !senha) {
+    errorEl.textContent = 'Preencha usuário e senha.';
+    return;
+  }
+
+  const senhaHash = await sha256Hex(senha);
+  const match = accounts.find(a => a.usuario === usuario && a.senha === senhaHash);
+  if (!match) {
+    errorEl.textContent = 'Usuário ou senha incorretos.';
+    return;
+  }
+
+  errorEl.textContent = '';
+  currentAccount = match;
+  document.getElementById('login-usuario').value = '';
+  document.getElementById('login-senha').value = '';
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-root').style.display = 'block';
+  applyAccountAccess();
+
+  const firstAllowed = currentAccount.isAdmin
+    ? 'pedidos'
+    : (ASSIGNABLE_TABS.map(t => t.key).find(k => (currentAccount.allowedTabs || []).includes(k)) || null);
+
+  if (firstAllowed) {
+    switchTab(firstAllowed);
+  } else {
+    document.getElementById('current-tab-label').textContent = 'Nenhuma aba liberada — fale com o administrador';
+  }
+}
+
+function doLogout() {
+  currentAccount = null;
+  closeDrawer();
+  document.getElementById('app-root').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function applyAccountAccess() {
+  document.getElementById('drawer-title').textContent = currentAccount.usuario + (currentAccount.isAdmin ? ' (admin)' : '');
+  document.querySelectorAll('.drawer-item[data-tab]').forEach(el => {
+    const tab = el.dataset.tab;
+    el.style.display = hasAccess(tab) ? 'flex' : 'none';
+  });
+  if (activeTab && !hasAccess(activeTab)) {
+    const firstAllowed = currentAccount.isAdmin
+      ? 'pedidos'
+      : (ASSIGNABLE_TABS.map(t => t.key).find(k => (currentAccount.allowedTabs || []).includes(k)) || null);
+    if (firstAllowed) switchTab(firstAllowed);
+  }
+}
+
+/* ---------- CONTAS: CRUD ---------- */
+function renderTabChecklist() {
+  const wrap = document.getElementById('a-tabs-checklist');
+  wrap.innerHTML = ASSIGNABLE_TABS.map(t => `
+    <label>
+      <input type="checkbox" class="a-tab-check" value="${t.key}">
+      ${t.label}
+    </label>
+  `).join('');
+}
+
+function toggleAdminChecklist() {
+  const isAdmin = document.getElementById('a-admin').checked;
+  document.getElementById('a-tabs-checklist').classList.toggle('disabled', isAdmin);
+}
+
+function clearAccountForm() {
+  document.getElementById('a-usuario').value = '';
+  document.getElementById('a-senha').value = '';
+  document.getElementById('a-admin').checked = false;
+  renderTabChecklist();
+  toggleAdminChecklist();
+}
+
+async function submitAccount() {
+  const usuario = document.getElementById('a-usuario').value.trim();
+  const senha = document.getElementById('a-senha').value.trim();
+  const isAdmin = document.getElementById('a-admin').checked;
+  const allowedTabs = Array.from(document.querySelectorAll('.a-tab-check:checked')).map(c => c.value);
+
+  if (!usuario) {
+    alert('Preencha o usuário.');
+    return;
+  }
+  const duplicate = accounts.find(a => a.usuario === usuario && a.id !== editingAccountId);
+  if (duplicate) {
+    alert('Já existe uma conta com esse usuário.');
+    return;
+  }
+
+  const payload = { usuario, isAdmin, allowedTabs: isAdmin ? [] : allowedTabs };
+
+  if (editingAccountId) {
+    if (senha) payload.senha = await sha256Hex(senha);
+    accountsRef.doc(editingAccountId).update(payload)
+      .then(() => cancelEditAccount())
+      .catch(err => alert('Erro ao salvar: ' + err.message));
+  } else {
+    if (!senha) {
+      alert('Preencha uma senha para a nova conta.');
+      return;
+    }
+    payload.senha = await sha256Hex(senha);
+    accountsRef.add(payload)
+      .then(() => clearAccountForm())
+      .catch(err => alert('Erro ao salvar: ' + err.message));
+  }
+}
+
+function editAccount(id) {
+  const a = accounts.find(x => x.id === id);
+  if (!a) return;
+  editingAccountId = id;
+  document.getElementById('account-form-title').textContent = 'Editando: ' + a.usuario;
+  document.getElementById('a-usuario').value = a.usuario;
+  document.getElementById('a-senha').value = '';
+  document.getElementById('a-senha').placeholder = 'Deixe em branco para manter a senha atual';
+  document.getElementById('a-admin').checked = a.isAdmin;
+  renderTabChecklist();
+  document.querySelectorAll('.a-tab-check').forEach(c => {
+    c.checked = (a.allowedTabs || []).includes(c.value);
+  });
+  toggleAdminChecklist();
+  document.getElementById('a-submit-btn').textContent = 'Salvar alterações';
+  document.getElementById('a-cancel-btn').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEditAccount() {
+  editingAccountId = null;
+  document.getElementById('account-form-title').textContent = 'Nova conta';
+  document.getElementById('a-submit-btn').textContent = 'Salvar conta';
+  document.getElementById('a-cancel-btn').style.display = 'none';
+  document.getElementById('a-senha').placeholder = 'Ex: 159753';
+  clearAccountForm();
+}
+
+function deleteAccount(id) {
+  const a = accounts.find(x => x.id === id);
+  if (!a) return;
+  if (a.id === currentAccount.id) {
+    alert('Você não pode excluir a conta com a qual está logado.');
+    return;
+  }
+  if (a.isAdmin && accounts.filter(x => x.isAdmin).length <= 1) {
+    alert('Não é possível excluir o único administrador.');
+    return;
+  }
+  if (!confirm('Remover a conta "' + a.usuario + '"?')) return;
+  accountsRef.doc(id).delete();
+  if (editingAccountId === id) cancelEditAccount();
+}
+
+function populateOrphanTargetSelect() {
+  const sel = document.getElementById('orphan-target-account');
+  if (!sel) return;
+  const current = sel.value;
+  const sorted = [...accounts].sort((a,b) => a.usuario.localeCompare(b.usuario));
+  sel.innerHTML = sorted.map(a => `<option value="${a.id}">${escapeHtml(a.usuario)}${a.isAdmin ? ' (admin)' : ''}</option>`).join('');
+  if (current && sorted.some(a => a.id === current)) sel.value = current;
+}
+
+async function reassignOrphans() {
+  const targetId = document.getElementById('orphan-target-account').value;
+  if (!targetId) {
+    alert('Cadastre pelo menos uma conta primeiro.');
+    return;
+  }
+  const targetAccount = accounts.find(a => a.id === targetId);
+  const orphanOrders = orders.filter(o => !o.donoId);
+  const orphanClients = clients.filter(c => !c.donoId);
+
+  if (!orphanOrders.length && !orphanClients.length) {
+    alert('Não há pedidos ou clientes sem dono pra atribuir.');
+    return;
+  }
+  if (!confirm(`Atribuir ${orphanOrders.length} pedido(s) e ${orphanClients.length} cliente(s) sem dono para "${targetAccount.usuario}"? Essa ação não pode ser desfeita.`)) return;
+
+  try {
+    const batch = db.batch();
+    orphanOrders.forEach(o => batch.update(ordersRef.doc(o.id), { donoId: targetId }));
+    orphanClients.forEach(c => batch.update(clientsRef.doc(c.id), { donoId: targetId }));
+    await batch.commit();
+    alert('Pronto! Pedidos e clientes atribuídos com sucesso.');
+  } catch (err) {
+    alert('Erro ao atribuir: ' + err.message);
+  }
+}
+
+function renderAccountsList() {
+  const wrap = document.getElementById('accounts-list');
+  if (!document.getElementById('a-tabs-checklist').children.length) renderTabChecklist();
+  populateOrphanTargetSelect();
+  if (!accounts.length) {
+    wrap.innerHTML = '<div class="empty">Nenhuma conta cadastrada ainda.</div>';
+    return;
+  }
+  const sorted = [...accounts].sort((a,b) => a.usuario.localeCompare(b.usuario));
+  wrap.innerHTML = sorted.map(a => `
+    <div class="account-card">
+      <div class="account-card-top">
+        <div class="account-user">${escapeHtml(a.usuario)}</div>
+        <span class="status ${a.isAdmin ? 'publicada' : ''}">${a.isAdmin ? 'Admin' : (a.allowedTabs || []).length + ' aba(s)'}</span>
+      </div>
+      ${!a.isAdmin && a.allowedTabs && a.allowedTabs.length
+        ? `<div style="font-size:12px;color:#8A7160;margin-top:6px;">${a.allowedTabs.map(k => (ASSIGNABLE_TABS.find(t=>t.key===k)||{}).label).filter(Boolean).join(', ')}</div>`
+        : ''}
+      <div class="recipe-actions">
+        <button onclick="editAccount('${a.id}')">✏️ Editar</button>
+        <button class="btn-del" onclick="deleteAccount('${a.id}')">🗑 Excluir</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ---------- PRECIFICAÇÃO ---------- */
+const DEFAULT_PRICING_ITEMS = [
+  'Matéria-prima do cookie',
+  'Matéria-prima da ganache/recheio',
+  'Copo',
+  'Adesivo',
+  'Embalagem de entrega',
+  'Cartão fidelidade (rateio)'
+];
+
+function addPricingItemRow(item) {
+  const id = 'pi-' + (pricingItemCount++);
+  const wrap = document.getElementById('pr-itens-rows');
+  const row = document.createElement('div');
+  row.className = 'pricing-item-row';
+  row.id = id;
+  const nome = item && item.nome ? item.nome : (typeof item === 'string' ? item : '');
+  const valor = item && item.valor != null ? item.valor : '';
+  row.innerHTML = `
+    <input class="pi-nome" type="text" placeholder="Ex: Copo" value="${escapeHtml(nome)}" oninput="renderPricingResult()">
+    <input class="pi-valor" type="number" min="0" step="0.01" placeholder="R$" value="${escapeHtml(String(valor))}" oninput="renderPricingResult()">
+    <button class="row-remove" onclick="document.getElementById('${id}').remove(); renderPricingResult();">✕</button>
+  `;
+  wrap.appendChild(row);
+}
+
+function clearPricingForm() {
+  document.getElementById('pr-nome').value = '';
+  document.getElementById('pr-despesas').value = '';
+  document.getElementById('pr-margem').value = '';
+  document.getElementById('pr-preco-atual').value = '';
+  document.getElementById('pr-itens-rows').innerHTML = '';
+  DEFAULT_PRICING_ITEMS.forEach(nome => addPricingItemRow({ nome, valor: '' }));
+  renderPricingResult();
+}
+
+function initPricingSync() {
+  clearPricingForm();
+  pricingRef.onSnapshot(snapshot => {
+    pricingProfiles = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        nome: data.nome || '',
+        itens: data.itens || [],
+        despesasVariaveisPct: typeof data.despesasVariaveisPct === 'number' ? data.despesasVariaveisPct : 0,
+        margemDesejadaPct: typeof data.margemDesejadaPct === 'number' ? data.margemDesejadaPct : 0,
+        precoPraticado: typeof data.precoPraticado === 'number' ? data.precoPraticado : null
+      };
+    });
+    if (activeTab === 'precificacao') renderPricingProfilesList();
+  }, err => console.error('Erro de sincronização de precificação', err));
+}
+
+function computePricing() {
+  const itens = Array.from(document.querySelectorAll('#pr-itens-rows .pricing-item-row')).map(row => ({
+    nome: row.querySelector('.pi-nome').value.trim(),
+    valor: parseFloat(row.querySelector('.pi-valor').value) || 0
+  }));
+  const custoTotal = itens.reduce((sum, i) => sum + i.valor, 0);
+  const despesasPct = parseFloat(document.getElementById('pr-despesas').value) || 0;
+  const margemPct = parseFloat(document.getElementById('pr-margem').value) || 0;
+  const precoAtual = parseFloat(document.getElementById('pr-preco-atual').value) || null;
+
+  const markupDivisor = 1 - (despesasPct + margemPct) / 100;
+  const valido = markupDivisor > 0;
+  const precoSugerido = valido ? custoTotal / markupDivisor : null;
+  const markupMultiplicador = (valido && custoTotal > 0) ? precoSugerido / custoTotal : null;
+
+  let margemAtual = null, lucroAtual = null, markupAtual = null;
+  if (precoAtual && precoAtual > 0) {
+    lucroAtual = precoAtual - custoTotal;
+    margemAtual = lucroAtual / precoAtual;
+    markupAtual = custoTotal > 0 ? precoAtual / custoTotal : null;
+  }
+
+  return { itens, custoTotal, despesasPct, margemPct, precoAtual, markupDivisor, valido, precoSugerido, markupMultiplicador, margemAtual, lucroAtual, markupAtual };
+}
+
+function renderPricingResult() {
+  const r = computePricing();
+  const wrap = document.getElementById('pricing-result');
+  if (!wrap) return;
+
+  if (!r.valido) {
+    wrap.innerHTML = `<div style="color:#B33A3A;font-size:13px;">A soma de despesas variáveis + margem desejada precisa ser menor que 100%.</div>`;
+    return;
+  }
+
+  let html = `
+    <div class="pricing-result-row"><div>Custo total por unidade</div><div>${fmtMoney(r.custoTotal)}</div></div>
+    <div class="pricing-result-row highlight"><div>Preço de venda sugerido</div><div>${fmtMoney(r.precoSugerido)}</div></div>
+    <div class="pricing-result-row"><div>Markup (multiplicador)</div><div>${r.markupMultiplicador ? r.markupMultiplicador.toFixed(2) + 'x' : '-'}</div></div>
+    <div class="pricing-result-row"><div>Margem de lucro (sobre o preço)</div><div>${r.margemPct.toFixed(1)}%</div></div>
+    <div class="pricing-result-row"><div>Lucro por unidade (no preço sugerido)</div><div>${fmtMoney(r.precoSugerido - r.custoTotal)}</div></div>
+  `;
+
+  if (r.precoAtual) {
+    html += `
+      <div class="pricing-result-row" style="margin-top:10px;padding-top:14px;border-top:1px dashed rgba(181,101,29,0.3);"><div><strong>Se vender pelo preço praticado (${fmtMoney(r.precoAtual)}):</strong></div><div></div></div>
+      <div class="pricing-result-row"><div>Lucro por unidade</div><div>${fmtMoney(r.lucroAtual)}</div></div>
+      <div class="pricing-result-row"><div>Margem real</div><div>${(r.margemAtual*100).toFixed(1)}%</div></div>
+      <div class="pricing-result-row"><div>Markup real</div><div>${r.markupAtual ? r.markupAtual.toFixed(2) + 'x' : '-'}</div></div>
+    `;
+  }
+
+  wrap.innerHTML = html;
+}
+
+function submitPricingProfile() {
+  const nome = document.getElementById('pr-nome').value.trim();
+  if (!nome) {
+    alert('Dê um nome pro cálculo (ex: o sabor do produto).');
+    return;
+  }
+  const r = computePricing();
+  const payload = {
+    nome,
+    itens: r.itens,
+    despesasVariaveisPct: r.despesasPct,
+    margemDesejadaPct: r.margemPct,
+    precoPraticado: r.precoAtual
+  };
+
+  if (editingPricingId) {
+    pricingRef.doc(editingPricingId).update(payload)
+      .then(() => cancelEditPricing())
+      .catch(err => alert('Erro ao salvar: ' + err.message));
+  } else {
+    pricingRef.add(payload)
+      .then(() => clearPricingForm())
+      .catch(err => alert('Erro ao salvar: ' + err.message));
+  }
+}
+
+function editPricingProfile(id) {
+  const p = pricingProfiles.find(x => x.id === id);
+  if (!p) return;
+  editingPricingId = id;
+  document.getElementById('pricing-form-title').textContent = 'Editando: ' + p.nome;
+  document.getElementById('pr-nome').value = p.nome;
+  document.getElementById('pr-despesas').value = p.despesasVariaveisPct || '';
+  document.getElementById('pr-margem').value = p.margemDesejadaPct || '';
+  document.getElementById('pr-preco-atual').value = p.precoPraticado || '';
+  document.getElementById('pr-itens-rows').innerHTML = '';
+  (p.itens.length ? p.itens : DEFAULT_PRICING_ITEMS.map(nome => ({nome, valor: ''}))).forEach(i => addPricingItemRow(i));
+  document.getElementById('pr-submit-btn').textContent = 'Salvar alterações';
+  document.getElementById('pr-cancel-btn').style.display = 'block';
+  renderPricingResult();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEditPricing() {
+  editingPricingId = null;
+  document.getElementById('pricing-form-title').textContent = 'Novo cálculo';
+  document.getElementById('pr-submit-btn').textContent = 'Salvar cálculo';
+  document.getElementById('pr-cancel-btn').style.display = 'none';
+  clearPricingForm();
+}
+
+function deletePricingProfile(id) {
+  if (!confirm('Remover este cálculo de precificação?')) return;
+  pricingRef.doc(id).delete();
+  if (editingPricingId === id) cancelEditPricing();
+}
+
+function renderPricingProfilesList() {
+  const wrap = document.getElementById('pricing-profiles-list');
+  if (!pricingProfiles.length) {
+    wrap.innerHTML = '<div class="empty">Nenhum cálculo salvo ainda.</div>';
+    return;
+  }
+  wrap.innerHTML = pricingProfiles.map(p => {
+    const custoTotal = p.itens.reduce((sum, i) => sum + (i.valor || 0), 0);
+    const markupDivisor = 1 - (p.despesasVariaveisPct + p.margemDesejadaPct) / 100;
+    const precoSugerido = markupDivisor > 0 ? custoTotal / markupDivisor : null;
+    return `
+      <div class="pricing-card">
+        <div class="recipe-card-top">
+          <div class="recipe-name">${escapeHtml(p.nome)}</div>
+          <span class="status publicada">${precoSugerido ? fmtMoney(precoSugerido) : '-'}</span>
+        </div>
+        <div style="font-size:12px;color:#8A7160;margin-top:4px;">Custo: ${fmtMoney(custoTotal)} · Margem: ${p.margemDesejadaPct}% · Despesas: ${p.despesasVariaveisPct}%</div>
+        <div class="recipe-actions">
+          <button onclick="editPricingProfile('${p.id}')">✏️ Editar</button>
+          <button class="btn-del" onclick="deletePricingProfile('${p.id}')">🗑 Excluir</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ---------- CLIENTES: busca no formulário de pedido ---------- */
+function clientPrefix(context) {
+  return context === 'form' ? 'f' : 'e';
+}
+
+function renderClientDropdown(context, query) {
+  const prefix = clientPrefix(context);
+  const dropdown = document.getElementById(prefix + '-cliente-dropdown');
+  const q = (query || '').trim().toLowerCase();
+  const visibleClients = clients.filter(c => canSeeOwner(c.donoId));
+  const matches = q
+    ? visibleClients.filter(c => c.nome.toLowerCase().includes(q))
+    : visibleClients;
+
+  if (!matches.length) {
+    dropdown.innerHTML = `<div class="client-dropdown-empty">${visibleClients.length ? 'Nenhum cliente encontrado.' : 'Nenhum cliente cadastrado ainda.'} Cadastre em "Cadastro de clientes".</div>`;
+  } else {
+    dropdown.innerHTML = matches.slice(0, 30).map(c => `
+      <div class="client-dropdown-item" onclick="selectClientFor('${context}','${c.id}')">
+        <strong>${escapeHtml(c.nome)}</strong>${c.referencia ? ` <span style="color:#A0917F;">— ${escapeHtml(c.referencia)}</span>` : ''}
+      </div>
+    `).join('');
+  }
+  dropdown.classList.add('open');
+}
+
+function selectClientFor(context, id) {
+  const c = clients.find(x => x.id === id);
+  if (!c) return;
+  if (context === 'form') {
+    formSelectedClienteId = c.id;
+    formSelectedClienteNome = c.nome;
+  } else {
+    editSelectedClienteId = c.id;
+    editSelectedClienteNome = c.nome;
+  }
+  const prefix = clientPrefix(context);
+  document.getElementById(prefix + '-cliente-search').value = '';
+  document.getElementById(prefix + '-cliente-dropdown').classList.remove('open');
+  renderSelectedClientTag(context);
+}
+
+function clearClientSelection(context) {
+  if (context === 'form') {
+    formSelectedClienteId = null;
+    formSelectedClienteNome = '';
+  } else {
+    editSelectedClienteId = null;
+    editSelectedClienteNome = '';
+  }
+  renderSelectedClientTag(context);
+}
+
+function renderSelectedClientTag(context) {
+  const id = context === 'form' ? formSelectedClienteId : editSelectedClienteId;
+  const nome = context === 'form' ? formSelectedClienteNome : editSelectedClienteNome;
+  const prefix = clientPrefix(context);
+  const wrap = document.getElementById(prefix + '-cliente-selected');
+  wrap.innerHTML = (id || nome)
+    ? `<div class="client-selected-tag">👤 ${escapeHtml(nome)} <button onclick="clearClientSelection('${context}')">✕</button></div>`
+    : '';
+}
+
+document.addEventListener('click', function(e) {
+  ['form','edit'].forEach(ctx => {
+    const prefix = clientPrefix(ctx);
+    const wrap = document.getElementById(prefix + '-cliente-search');
+    const dropdown = document.getElementById(prefix + '-cliente-dropdown');
+    if (wrap && dropdown && !wrap.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.remove('open');
+    }
+  });
+});
+
+/* ---------- CLIENTES: cadastro (CRUD) ---------- */
+function initClientsSync() {
+  clientsRef.onSnapshot(snapshot => {
+    clients = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        nome: data.nome || '',
+        referencia: data.referencia || '',
+        observacoes: data.observacoes || '',
+        donoId: data.donoId || null
+      };
+    });
+    if (activeTab === 'cadastro-clientes') renderClientsManageList();
+    if (activeTab === 'analise-clientes') renderClientsAnalysisList();
+    refreshOpenClientAnalysis();
+  }, err => console.error('Erro de sincronização de clientes', err));
+}
+
+function submitClient() {
+  const nome = document.getElementById('c-nome').value.trim();
+  const referencia = document.getElementById('c-referencia').value.trim();
+  const observacoes = document.getElementById('c-observacoes').value.trim();
+
+  if (!nome) {
+    alert('Preencha ao menos o nome do cliente.');
+    return;
+  }
+
+  const payload = { nome, referencia, observacoes };
+
+  if (editingClientId) {
+    clientsRef.doc(editingClientId).update(payload)
+      .then(() => cancelEditClient())
+      .catch(err => alert('Erro ao salvar: ' + err.message));
+  } else {
+    clientsRef.add({ ...payload, donoId: currentAccount.id })
+      .then(() => clearClientForm())
+      .catch(err => alert('Erro ao salvar: ' + err.message));
+  }
+}
+
+function clearClientForm() {
+  document.getElementById('c-nome').value = '';
+  document.getElementById('c-referencia').value = '';
+  document.getElementById('c-observacoes').value = '';
+}
+
+function editClient(id) {
+  const c = clients.find(x => x.id === id);
+  if (!c) return;
+  editingClientId = id;
+  document.getElementById('client-form-title').textContent = 'Editando: ' + c.nome;
+  document.getElementById('c-nome').value = c.nome;
+  document.getElementById('c-referencia').value = c.referencia;
+  document.getElementById('c-observacoes').value = c.observacoes;
+  document.getElementById('c-submit-btn').textContent = 'Salvar alterações';
+  document.getElementById('c-cancel-btn').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEditClient() {
+  editingClientId = null;
+  document.getElementById('client-form-title').textContent = 'Novo cliente';
+  document.getElementById('c-submit-btn').textContent = 'Salvar cliente';
+  document.getElementById('c-cancel-btn').style.display = 'none';
+  clearClientForm();
+}
+
+function deleteClient(id) {
+  if (!confirm('Remover este cliente? Os pedidos já feitos por ele não serão apagados.')) return;
+  clientsRef.doc(id).delete();
+  if (editingClientId === id) cancelEditClient();
+}
+
+function ordersForClient(client) {
+  return orders.filter(o => o.clienteId ? o.clienteId === client.id : o.cliente.trim().toLowerCase() === client.nome.trim().toLowerCase());
+}
+
+function renderClientsManageList() {
+  const wrap = document.getElementById('clients-manage-list');
+  const visibleClients = clients.filter(c => canSeeOwner(c.donoId));
+  if (!visibleClients.length) {
+    wrap.innerHTML = '<div class="empty">Nenhum cliente cadastrado ainda.</div>';
+    return;
+  }
+  const sorted = [...visibleClients].sort((a,b) => a.nome.localeCompare(b.nome));
+  wrap.innerHTML = sorted.map(c => `
+    <div class="client-card" style="cursor:default;">
+      <div class="client-card-top">
+        <div>
+          <div class="client-name">${escapeHtml(c.nome)}</div>
+          ${c.referencia ? `<div class="client-ref">${escapeHtml(c.referencia)}</div>` : ''}
+        </div>
+      </div>
+      ${c.observacoes ? `<div class="client-detail-obs" style="margin-top:8px;">${escapeHtml(c.observacoes)}</div>` : ''}
+      <div class="recipe-actions">
+        <button onclick="editClient('${c.id}')">✏️ Editar</button>
+        <button class="btn-del" onclick="deleteClient('${c.id}')">🗑 Excluir</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ---------- CLIENTES: análise / reincidência ---------- */
+function renderClientsAnalysisList() {
+  const wrap = document.getElementById('clients-analysis-list');
+  const visibleClients = clients.filter(c => canSeeOwner(c.donoId));
+  if (!visibleClients.length) {
+    wrap.innerHTML = '<div class="empty">Nenhum cliente cadastrado ainda.</div>';
+    return;
+  }
+  const withStats = visibleClients.map(c => {
+    const cOrders = ordersForClient(c);
+    return { client: c, count: cOrders.length };
+  }).sort((a,b) => b.count - a.count || a.client.nome.localeCompare(b.client.nome));
+
+  wrap.innerHTML = withStats.map(({client, count}) => `
+    <div class="client-card" onclick="openClientAnalysis('${client.id}')">
+      <div class="client-card-top">
+        <div>
+          <div class="client-name">${escapeHtml(client.nome)}</div>
+          ${client.referencia ? `<div class="client-ref">${escapeHtml(client.referencia)}</div>` : ''}
+        </div>
+        <span class="client-badge ${count >= 2 ? 'recorrente' : ''}">${count === 0 ? 'Sem pedidos' : count === 1 ? '1 pedido' : (count >= 2 ? '🔥 ' : '') + count + ' pedidos'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+let currentAnalysisClientId = null;
+
+function openClientAnalysis(clientId) {
+  currentAnalysisClientId = clientId;
+  renderClientAnalysisBody(clientId);
+  document.getElementById('client-analysis-overlay').classList.add('open');
+}
+
+function renderClientAnalysisBody(clientId) {
+  const c = clients.find(x => x.id === clientId);
+  if (!c) return;
+  const cOrders = ordersForClient(c).sort((a,b) => (b.dataPedido || '').localeCompare(a.dataPedido || ''));
+
+  const totalPedidos = cOrders.length;
+  const totalValor = cOrders.reduce((sum,o) => sum + (o.valor || 0), 0);
+  const datasPedido = cOrders.map(o => o.dataPedido).filter(Boolean).sort();
+  const primeira = datasPedido[0];
+  const ultima = datasPedido[datasPedido.length - 1];
+
+  let intervaloMedio = '-';
+  if (datasPedido.length >= 2) {
+    const first = new Date(datasPedido[0]);
+    const last = new Date(datasPedido[datasPedido.length - 1]);
+    const diffDays = Math.round((last - first) / (1000*60*60*24));
+    intervaloMedio = Math.round(diffDays / (datasPedido.length - 1)) + ' dias';
+  }
+
+  const byProduct = {};
+  cOrders.forEach(o => o.items.forEach(it => { byProduct[it.produto] = (byProduct[it.produto] || 0) + it.quantidade; }));
+  const produtoFavorito = Object.keys(byProduct).length
+    ? Object.entries(byProduct).sort((a,b) => b[1]-a[1])[0][0]
+    : '-';
+
+  document.getElementById('client-analysis-body').innerHTML = `
+    <div class="client-detail-title">${escapeHtml(c.nome)}</div>
+    ${c.referencia ? `<div class="client-detail-ref">${escapeHtml(c.referencia)}</div>` : ''}
+    ${c.observacoes ? `<div class="client-detail-obs">${escapeHtml(c.observacoes)}</div>` : ''}
+
+    <div class="client-kpis">
+      <div class="kpi"><div class="kpi-value">${totalPedidos}</div><div class="kpi-label">Pedidos feitos</div></div>
+      <div class="kpi"><div class="kpi-value">${fmtMoney(totalValor)}</div><div class="kpi-label">Total gasto</div></div>
+      <div class="kpi"><div class="kpi-value" style="font-size:13px">${primeira ? fmtDate(primeira) : '-'}</div><div class="kpi-label">Primeira compra</div></div>
+      <div class="kpi"><div class="kpi-value" style="font-size:13px">${ultima ? fmtDate(ultima) : '-'}</div><div class="kpi-label">Última compra</div></div>
+    </div>
+    <div style="font-size:12px;color:#8A7160;margin:-8px 0 14px;">Intervalo médio entre compras: <strong>${intervaloMedio}</strong> · Produto favorito: <strong>${escapeHtml(produtoFavorito)}</strong></div>
+
+    <div class="section-title" style="margin-top:0">Histórico de compras</div>
+    ${cOrders.length ? cOrders.map(o => `
+      <div class="order">
+        <div class="order-top">
+          <div class="order-client">${fmtDate(o.dataPedido)}</div>
+          <div class="order-date">Entrega: ${fmtDate(o.dataEntrega)}</div>
+        </div>
+        <div class="order-products">${escapeHtml(itemsSummary(o.items))}</div>
+        ${o.valor ? `<div class="order-value">${fmtMoney(o.valor)}</div>` : ''}
+        <div class="order-meta">
+          <span class="status ${o.status === 'entregue' ? 'entregue' : ''}">${o.status === 'entregue' ? 'Entregue' : 'Pendente'}</span>
+          <span class="status ${o.pago ? 'pago' : 'naopago'}">${o.pago ? 'Pago' : 'Não pago'}</span>
+        </div>
+      </div>
+    `).join('') : '<div class="empty">Esse cliente ainda não fez pedidos.</div>'}
+  `;
+}
+
+function refreshOpenClientAnalysis() {
+  if (currentAnalysisClientId && document.getElementById('client-analysis-overlay').classList.contains('open')) {
+    renderClientAnalysisBody(currentAnalysisClientId);
+  }
+}
+
+function closeClientAnalysis() {
+  document.getElementById('client-analysis-overlay').classList.remove('open');
+  currentAnalysisClientId = null;
+}
+function closeClientAnalysisBg(e) {
+  if (e.target.id === 'client-analysis-overlay') closeClientAnalysis();
+}
+
+/* ---------- RECEITAS: linhas dinâmicas ---------- */
+function addIngredientRow(ing) {
+  const id = 'ing-' + (ingredientCount++);
+  const wrap = document.getElementById('r-ingredientes-rows');
+  const row = document.createElement('div');
+  row.className = 'ingredient-row';
+  row.id = id;
+
+  // Compatibilidade com receitas antigas, onde o ingrediente era só uma linha de texto
+  let nome = '', quantidade = '', unidade = 'g';
+  if (ing && typeof ing === 'object') {
+    nome = ing.nome || '';
+    quantidade = ing.quantidade != null ? ing.quantidade : '';
+    unidade = ing.unidade || 'g';
+  } else if (typeof ing === 'string') {
+    nome = ing;
+  }
+
+  row.innerHTML = `
+    <input class="ing-nome" type="text" placeholder="Ex: Chocolate meio amargo" value="${escapeHtml(nome)}">
+    <input class="ing-qtd" type="number" min="0" step="0.01" placeholder="Qtd" value="${escapeHtml(String(quantidade))}">
+    <select class="ing-un">
+      <option value="g">g</option>
+      <option value="kg">kg</option>
+      <option value="ml">ml</option>
+      <option value="l">l</option>
+      <option value="un">un</option>
+    </select>
+    <button class="row-remove" onclick="document.getElementById('${id}').remove()">✕</button>
+  `;
+  wrap.appendChild(row);
+  row.querySelector('.ing-un').value = unidade;
+}
+function addStepRow(value) {
+  const id = 'step-' + (stepCount++);
+  const wrap = document.getElementById('r-passos-rows');
+  const row = document.createElement('div');
+  row.className = 'dynamic-list-row';
+  row.id = id;
+  row.innerHTML = `
+    <input type="text" placeholder="Ex: Misture os ingredientes secos" value="${escapeHtml(value || '')}">
+    <button class="row-remove" onclick="document.getElementById('${id}').remove()">✕</button>
+  `;
+  wrap.appendChild(row);
+}
+function populateRecipeProductSelect() {
+  const sel = document.getElementById('r-produto');
+  PRODUCTS.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = p;
+    sel.appendChild(opt);
+  });
+}
+function clearRecipeForm() {
+  document.getElementById('r-nome').value = '';
+  document.getElementById('r-desc').value = '';
+  document.getElementById('r-produto').value = '';
+  document.getElementById('r-publicar').checked = false;
+  document.getElementById('r-ingredientes-rows').innerHTML = '';
+  document.getElementById('r-passos-rows').innerHTML = '';
+  addIngredientRow();
+  addStepRow();
+}
+
+/* ---------- RECEITAS: sync ---------- */
+function initRecipesSync() {
+  populateRecipeProductSelect();
+  addIngredientRow();
+  addStepRow();
+
+  recipesRef.onSnapshot(snapshot => {
+    recipes = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        nome: data.nome || '',
+        descricao: data.descricao || '',
+        produto: data.produto || '',
+        ingredientes: data.ingredientes || [],
+        passos: data.passos || [],
+        publicada: !!data.publicada
+      };
+    });
+    if (activeTab === 'gerenciar-receitas') renderRecipesManageList();
+    if (activeTab === 'receitas-publicas') renderRecipesPublicList();
+  }, err => console.error('Erro de sincronização de receitas', err));
+}
+
+function submitRecipe() {
+  const nome = document.getElementById('r-nome').value.trim();
+  const descricao = document.getElementById('r-desc').value.trim();
+  const produto = document.getElementById('r-produto').value;
+  const publicada = document.getElementById('r-publicar').checked;
+  const ingredientes = Array.from(document.querySelectorAll('#r-ingredientes-rows .ingredient-row')).map(row => ({
+    nome: row.querySelector('.ing-nome').value.trim(),
+    quantidade: parseFloat(row.querySelector('.ing-qtd').value) || 0,
+    unidade: row.querySelector('.ing-un').value
+  })).filter(i => i.nome);
+  const passos = Array.from(document.querySelectorAll('#r-passos-rows input'))
+    .map(i => i.value.trim()).filter(Boolean);
+
+  if (!nome || ingredientes.length === 0 || passos.length === 0) {
+    alert('Preencha o nome, ao menos 1 ingrediente (com nome) e 1 passo.');
+    return;
+  }
+  const semQuantidade = ingredientes.some(i => !i.quantidade);
+  if (semQuantidade && !confirm('Algum ingrediente está sem quantidade — a baixa automática de estoque não vai funcionar direito pra ele. Salvar mesmo assim?')) {
+    return;
+  }
+
+  const payload = { nome, descricao, produto, ingredientes, passos, publicada };
+
+  if (editingRecipeId) {
+    recipesRef.doc(editingRecipeId).update(payload)
+      .then(() => { cancelEditRecipe(); })
+      .catch(err => alert('Erro ao salvar: ' + err.message));
+  } else {
+    recipesRef.add(payload)
+      .then(() => { clearRecipeForm(); })
+      .catch(err => alert('Erro ao salvar: ' + err.message));
+  }
+}
+
+function editRecipe(id) {
+  const r = recipes.find(x => x.id === id);
+  if (!r) return;
+  editingRecipeId = id;
+  document.getElementById('recipe-form-title').textContent = 'Editando: ' + r.nome;
+  document.getElementById('r-nome').value = r.nome;
+  document.getElementById('r-desc').value = r.descricao;
+  document.getElementById('r-produto').value = r.produto || '';
+  document.getElementById('r-publicar').checked = r.publicada;
+  document.getElementById('r-ingredientes-rows').innerHTML = '';
+  document.getElementById('r-passos-rows').innerHTML = '';
+  r.ingredientes.forEach(i => addIngredientRow(i));
+  r.passos.forEach(p => addStepRow(p));
+  document.getElementById('r-submit-btn').textContent = 'Salvar alterações';
+  document.getElementById('r-cancel-btn').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEditRecipe() {
+  editingRecipeId = null;
+  document.getElementById('recipe-form-title').textContent = 'Nova receita';
+  document.getElementById('r-submit-btn').textContent = 'Salvar receita';
+  document.getElementById('r-cancel-btn').style.display = 'none';
+  clearRecipeForm();
+}
+
+function togglePublicada(id) {
+  const r = recipes.find(x => x.id === id);
+  if (!r) return;
+  recipesRef.doc(id).update({ publicada: !r.publicada });
+}
+
+function deleteRecipe(id) {
+  if (!confirm('Remover esta receita?')) return;
+  recipesRef.doc(id).delete();
+  if (editingRecipeId === id) cancelEditRecipe();
+}
+
+function fmtIngredient(i) {
+  if (typeof i === 'string') return i;
+  const qtd = i.quantidade ? `${i.quantidade}${i.unidade || ''}` : '(qtd. não informada)';
+  return `${qtd} de ${i.nome}`;
+}
+
+function renderRecipesManageList() {
+  const wrap = document.getElementById('recipes-manage-list');
+  if (!recipes.length) {
+    wrap.innerHTML = '<div class="empty">Nenhuma receita cadastrada ainda.</div>';
+    return;
+  }
+  wrap.innerHTML = recipes.map(r => `
+    <div class="recipe-card">
+      <div class="recipe-card-top">
+        <div>
+          <div class="recipe-name">${escapeHtml(r.nome)}</div>
+          ${r.produto ? `<div style="font-size:11.5px;color:#B5651D;font-weight:600;margin-top:2px;">🔗 ${escapeHtml(r.produto)}</div>` : `<div style="font-size:11.5px;color:#A0917F;margin-top:2px;">Sem sabor vinculado</div>`}
+        </div>
+        <span class="status ${r.publicada ? 'publicada' : 'rascunho'}">${r.publicada ? 'Publicada' : 'Rascunho'}</span>
+      </div>
+      ${r.descricao ? `<div class="recipe-desc">${escapeHtml(r.descricao)}</div>` : ''}
+      <div class="recipe-sub">Ingredientes (${r.ingredientes.length})</div>
+      <ul class="recipe-list">${r.ingredientes.map(i => `<li>${escapeHtml(fmtIngredient(i))}</li>`).join('')}</ul>
+      <div class="recipe-sub">Modo de preparo (${r.passos.length} passos)</div>
+      <ul class="recipe-list">${r.passos.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
+      <div class="recipe-actions">
+        <button onclick="editRecipe('${r.id}')">✏️ Editar</button>
+        <button onclick="togglePublicada('${r.id}')">${r.publicada ? '👁️‍🗨️ Despublicar' : '📢 Publicar'}</button>
+        <button class="btn-del" onclick="deleteRecipe('${r.id}')">🗑 Excluir</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderRecipesPublicList() {
+  const wrap = document.getElementById('recipes-public-list');
+  const published = recipes.filter(r => r.publicada);
+  if (!published.length) {
+    wrap.innerHTML = '<div class="empty">Nenhuma receita publicada ainda.</div>';
+    return;
+  }
+  wrap.innerHTML = published.map(r => `
+    <div class="recipe-card">
+      <div class="recipe-name">${escapeHtml(r.nome)}</div>
+      ${r.descricao ? `<div class="recipe-desc">${escapeHtml(r.descricao)}</div>` : ''}
+      <div class="recipe-sub">Ingredientes</div>
+      <ul class="recipe-list">${r.ingredientes.map(i => `<li>${escapeHtml(fmtIngredient(i))}</li>`).join('')}</ul>
+      <div class="recipe-sub">Modo de preparo</div>
+      <ul class="recipe-list">${r.passos.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
+    </div>
+  `).join('');
+}
+
+initOrdersSync();
+initRecipesSync();
+initStockSync();
+initClientsSync();
+initAccountsSync();
+initPricingSync();
+</script>
+
+</body>
+</html>
