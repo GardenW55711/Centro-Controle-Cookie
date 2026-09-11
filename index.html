@@ -242,6 +242,14 @@
   }
   .alert-history-row:last-child { border-bottom:none; }
 
+  .outcome-btn-row { display:flex; gap:10px; margin-bottom:12px; }
+  .outcome-btn {
+    flex:1; padding:14px; border-radius:10px; border:2px solid #E4D9CC; background:white;
+    font-size:14px; font-weight:700; cursor:pointer; color:#8A7160;
+  }
+  .outcome-btn.selected.sim { border-color:#567048; background:#E4EEDF; color:#567048; }
+  .outcome-btn.selected.nao { border-color:#B33A3A; background:#FDECEA; color:#B33A3A; }
+
   .prod-summary-item {
     display: flex; justify-content: space-between; align-items: center;
     padding: 10px 0; border-bottom: 1px solid #F0E6D8; font-size: 14px;
@@ -657,6 +665,12 @@
     <div class="section-title" style="margin-top:0">Vendas por tipo de produto</div>
     <div class="chart-wrap"><canvas id="chart-produto"></canvas></div>
   </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Revenda: convertidas vs não convertidas</div>
+    <div style="font-size:11.5px;color:#A0917F;margin:-6px 0 10px;">Baseado nas tentativas de venda registradas na Análise de Clientes.</div>
+    <div class="chart-wrap"><canvas id="chart-revenda"></canvas></div>
+  </div>
 </div>
 
 <!-- VIEW: GERENCIAR RECEITAS -->
@@ -718,6 +732,10 @@
       <div>
         <label>Nome</label>
         <input id="c-nome" type="text" placeholder="Nome do cliente">
+      </div>
+      <div>
+        <label>Telefone</label>
+        <input id="c-telefone" type="tel" placeholder="Ex: (24) 99999-9999">
       </div>
       <div>
         <label>Referência (ex: onde trabalha, indicação)</label>
@@ -914,6 +932,30 @@
   </div>
 </div>
 
+<!-- MODAL: TENTATIVA DE VENDA -->
+<div class="modal-overlay" id="sales-attempt-overlay" onclick="closeSalesAttemptBg(event)">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">Tentativa de venda</div>
+      <button class="modal-close" onclick="closeSalesAttempt()">✕</button>
+    </div>
+    <div style="font-size:13px;color:#8A7160;margin-bottom:14px;">Cliente: <strong id="sa-cliente-nome"></strong></div>
+
+    <div style="font-size:12px;font-weight:600;color:#8A7160;margin-bottom:8px;">A venda foi realizada?</div>
+    <div class="outcome-btn-row">
+      <button class="outcome-btn sim" id="sa-btn-sim" onclick="selectSalesOutcome(true)">✅ Sim, comprou</button>
+      <button class="outcome-btn nao" id="sa-btn-nao" onclick="selectSalesOutcome(false)">❌ Não comprou</button>
+    </div>
+
+    <div id="sa-motivo-wrap" style="display:none;">
+      <label>Motivo (por que não comprou)</label>
+      <textarea id="sa-motivo" placeholder="Ex: achou o preço alto, vai pensar, comprou de outro fornecedor..."></textarea>
+    </div>
+
+    <button class="primary" style="margin-top:14px;" onclick="saveSalesAttempt()">Salvar</button>
+  </div>
+</div>
+
 <!-- MODAL: PAINEL DE NOTIFICAÇÕES -->
 <div class="modal-overlay" id="alerts-panel-overlay" onclick="closeAlertsPanelBg(event)">
   <div class="modal-sheet">
@@ -948,6 +990,7 @@ const pricingRef = db.collection('pricing_profiles');
 const stockItemsRef = db.collection('stock_items');
 const stockAlertsRef = db.collection('stock_alerts');
 const stockLevelStateRef = db.collection('stock_level_state');
+const salesAttemptsRef = db.collection('sales_attempts');
 
 const PRODUCTS = [
   "Copo de Cookie (ao leite)",
@@ -986,6 +1029,10 @@ let accounts = [];
 let pricingProfiles = [];
 let stockItems = [];
 let stockAlerts = [];
+let salesAttempts = [];
+let saAttemptClienteId = null;
+let saAttemptClienteNome = '';
+let saOutcome = null;
 let alertsCheckInProgress = false;
 let editingStockItemId = null;
 let itemSelections = {}; // { [contexto]: { id, nome, unidade } }
@@ -1001,7 +1048,7 @@ let stockMoves = [];
 let clients = [];
 let currentQty = {};
 let calDate = new Date();
-let chartQtd, chartValor, chartProduto;
+let chartQtd, chartValor, chartProduto, chartRevenda;
 let activeTab = 'pedidos';
 let editingRecipeId = null;
 let editingOrderId = null;
@@ -1585,13 +1632,18 @@ function renderVendas() {
   PRODUCTS.forEach(p => byProduct[p] = 0);
   filtered.forEach(o => o.items.forEach(it => { byProduct[it.produto] = (byProduct[it.produto] || 0) + it.quantidade; }));
 
+  const attemptsFiltered = salesAttempts.filter(a => a.data && a.data >= ini && a.data <= fim);
+  const convertidas = attemptsFiltered.filter(a => a.convertida).length;
+  const naoConvertidas = attemptsFiltered.filter(a => !a.convertida).length;
+
   renderChart('chart-qtd', 'bar', dayLabels, [{ label: 'Unidades', data: qtdData, backgroundColor: '#B5651D' }], 'qtd');
   renderChart('chart-valor', 'bar', dayLabels, [{ label: 'Valor (R$)', data: valorData, backgroundColor: '#5C3A21' }], 'valor');
   renderChart('chart-produto', 'doughnut', PRODUCTS.map(p => p.replace('Copo de Cookie ','')), [{ data: PRODUCTS.map(p => byProduct[p]), backgroundColor: PRODUCT_COLORS }], 'produto');
+  renderChart('chart-revenda', 'doughnut', ['Convertidas', 'Não convertidas'], [{ data: [convertidas, naoConvertidas], backgroundColor: ['#567048', '#B33A3A'] }], 'revenda');
 }
 function renderChart(canvasId, type, labels, datasets, key) {
   const ctx = document.getElementById(canvasId).getContext('2d');
-  const existing = { qtd: chartQtd, valor: chartValor, produto: chartProduto }[key];
+  const existing = { qtd: chartQtd, valor: chartValor, produto: chartProduto, revenda: chartRevenda }[key];
   if (existing) existing.destroy();
   const opts = {
     type,
@@ -1607,6 +1659,7 @@ function renderChart(canvasId, type, labels, datasets, key) {
   if (key === 'qtd') chartQtd = chart;
   if (key === 'valor') chartValor = chart;
   if (key === 'produto') chartProduto = chart;
+  if (key === 'revenda') chartRevenda = chart;
 }
 
 /* ---------- ESTOQUE ---------- */
@@ -2716,6 +2769,7 @@ function initClientsSync() {
       return {
         id: doc.id,
         nome: data.nome || '',
+        telefone: data.telefone || '',
         referencia: data.referencia || '',
         observacoes: data.observacoes || '',
         donoId: data.donoId || null
@@ -2729,6 +2783,7 @@ function initClientsSync() {
 
 function submitClient() {
   const nome = document.getElementById('c-nome').value.trim();
+  const telefone = document.getElementById('c-telefone').value.trim();
   const referencia = document.getElementById('c-referencia').value.trim();
   const observacoes = document.getElementById('c-observacoes').value.trim();
 
@@ -2737,7 +2792,7 @@ function submitClient() {
     return;
   }
 
-  const payload = { nome, referencia, observacoes };
+  const payload = { nome, telefone, referencia, observacoes };
 
   if (editingClientId) {
     clientsRef.doc(editingClientId).update(payload)
@@ -2752,6 +2807,7 @@ function submitClient() {
 
 function clearClientForm() {
   document.getElementById('c-nome').value = '';
+  document.getElementById('c-telefone').value = '';
   document.getElementById('c-referencia').value = '';
   document.getElementById('c-observacoes').value = '';
 }
@@ -2762,6 +2818,7 @@ function editClient(id) {
   editingClientId = id;
   document.getElementById('client-form-title').textContent = 'Editando: ' + c.nome;
   document.getElementById('c-nome').value = c.nome;
+  document.getElementById('c-telefone').value = c.telefone || '';
   document.getElementById('c-referencia').value = c.referencia;
   document.getElementById('c-observacoes').value = c.observacoes;
   document.getElementById('c-submit-btn').textContent = 'Salvar alterações';
@@ -2800,6 +2857,7 @@ function renderClientsManageList() {
       <div class="client-card-top">
         <div>
           <div class="client-name">${escapeHtml(c.nome)}</div>
+          ${c.telefone ? `<div class="client-ref">📞 ${escapeHtml(c.telefone)}</div>` : ''}
           ${c.referencia ? `<div class="client-ref">${escapeHtml(c.referencia)}</div>` : ''}
         </div>
       </div>
@@ -2873,8 +2931,11 @@ function renderClientAnalysisBody(clientId) {
 
   document.getElementById('client-analysis-body').innerHTML = `
     <div class="client-detail-title">${escapeHtml(c.nome)}</div>
+    ${c.telefone ? `<div class="client-detail-ref">📞 ${escapeHtml(c.telefone)}</div>` : ''}
     ${c.referencia ? `<div class="client-detail-ref">${escapeHtml(c.referencia)}</div>` : ''}
     ${c.observacoes ? `<div class="client-detail-obs">${escapeHtml(c.observacoes)}</div>` : ''}
+
+    <button class="primary" style="margin-bottom:16px;" onclick="openSalesAttempt('${c.id}')">📇 Iniciar tentativa de venda (revenda)</button>
 
     <div class="client-kpis">
       <div class="kpi"><div class="kpi-value">${totalPedidos}</div><div class="kpi-label">Pedidos feitos</div></div>
@@ -2914,6 +2975,78 @@ function closeClientAnalysis() {
 }
 function closeClientAnalysisBg(e) {
   if (e.target.id === 'client-analysis-overlay') closeClientAnalysis();
+}
+
+/* ---------- TENTATIVAS DE VENDA (REVENDA) ---------- */
+function initSalesAttemptsSync() {
+  salesAttemptsRef.onSnapshot(snapshot => {
+    salesAttempts = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        clienteId: data.clienteId || null,
+        clienteNome: data.clienteNome || '',
+        convertida: !!data.convertida,
+        motivo: data.motivo || '',
+        data: data.data || '',
+        donoId: data.donoId || null
+      };
+    });
+    if (activeTab === 'vendas') renderVendas();
+  }, err => console.error('Erro de sincronização de tentativas de venda', err));
+}
+
+function openSalesAttempt(clienteId) {
+  const c = clients.find(x => x.id === clienteId);
+  if (!c) return;
+  saAttemptClienteId = clienteId;
+  saAttemptClienteNome = c.nome;
+  saOutcome = null;
+  document.getElementById('sa-cliente-nome').textContent = c.nome;
+  document.getElementById('sa-motivo').value = '';
+  document.getElementById('sa-motivo-wrap').style.display = 'none';
+  document.getElementById('sa-btn-sim').classList.remove('selected');
+  document.getElementById('sa-btn-nao').classList.remove('selected');
+  document.getElementById('sales-attempt-overlay').classList.add('open');
+}
+
+function selectSalesOutcome(convertida) {
+  saOutcome = convertida;
+  document.getElementById('sa-btn-sim').classList.toggle('selected', convertida === true);
+  document.getElementById('sa-btn-nao').classList.toggle('selected', convertida === false);
+  document.getElementById('sa-motivo-wrap').style.display = convertida === false ? 'block' : 'none';
+}
+
+function saveSalesAttempt() {
+  if (saOutcome === null) {
+    alert('Escolha se a venda foi realizada ou não.');
+    return;
+  }
+  const motivo = document.getElementById('sa-motivo').value.trim();
+  if (saOutcome === false && !motivo) {
+    alert('Preencha o motivo de não ter comprado.');
+    return;
+  }
+
+  salesAttemptsRef.add({
+    clienteId: saAttemptClienteId,
+    clienteNome: saAttemptClienteNome,
+    convertida: saOutcome,
+    motivo: saOutcome === false ? motivo : '',
+    data: todayISO(),
+    donoId: currentAccount.id
+  }).then(() => {
+    closeSalesAttempt();
+  }).catch(err => alert('Erro ao salvar: ' + err.message));
+}
+
+function closeSalesAttempt() {
+  document.getElementById('sales-attempt-overlay').classList.remove('open');
+  saAttemptClienteId = null;
+  saOutcome = null;
+}
+function closeSalesAttemptBg(e) {
+  if (e.target.id === 'sales-attempt-overlay') closeSalesAttempt();
 }
 
 /* ---------- RECEITAS: linhas dinâmicas ---------- */
@@ -3146,6 +3279,7 @@ initRecipesSync();
 initStockSync();
 initStockItemsSync();
 initStockAlertsSync();
+initSalesAttemptsSync();
 initClientsSync();
 initAccountsSync();
 initPricingSync();
