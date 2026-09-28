@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>Guia de componentes · Copo de Cookie</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.376.1/dist/umd/lucide.min.js" onerror="var l=document.createElement('script');l.src='https://cdn.jsdelivr.net/npm/lucide@0.376.1/dist/umd/lucide.min.js';l.onload=function(){window.dispatchEvent(new Event('lucide-ready'))};document.head.appendChild(l)"></script>
+<style>
+:root, [data-theme="light"] {
+  color-scheme: light dark;
+
+  /* ---- Cores de sistema do iOS (modo claro) ---- */
+  --blue: #007AFF;   --green: #34C759;  --red: #FF3B30;    --orange: #FF9500;
+  --yellow: #FFCC00; --pink: #FF2D55;   --purple: #AF52DE; --indigo: #5856D6;
+  --teal: #30B0C7;   --mint: #00C7BE;   --cyan: #32ADE6;   --brown: #A2845E;
+
+  /* ---- Fundos ---- */
+  --bg:                #FFFFFF;
+  --bg-secondary:      #F2F2F7;
+  --bg-tertiary:       #FFFFFF;
+  --bg-grouped:           #F2F2F7;
+  --bg-grouped-secondary: #FFFFFF;
+  --bg-grouped-tertiary:  #F2F2F7;
+
+  /* ---- Textos ---- */
+  --label:            #000000;
+  --label-secondary:  rgba(60, 60, 67, 0.60);
+  --label-tertiary:   rgba(60, 60, 67, 0.30);
+  --label-quaternary: rgba(60, 60, 67, 0.18);
+
+  /* ---- Linhas divisórias ---- */
+  --separator:        rgba(60, 60, 67, 0.29);
+  --separator-opaque: #C6C6C8;
+
+  /* ---- Preenchimentos ---- */
+  --fill:            rgba(120, 120, 128, 0.20);
+  --fill-secondary:  rgba(120, 120, 128, 0.16);
+  --fill-tertiary:   rgba(118, 118, 128, 0.12);
+  --fill-quaternary: rgba(116, 116, 128, 0.08);
+
+  /* ---- Cinzas ---- */
+  --gray:  #8E8E93;
+  --gray2: #AEAEB2;
+  --gray3: #C7C7CC;
+  --gray4: #D1D1D6;
+  --gray5: #E5E5EA;
+  --gray6: #F2F2F7;
+
+  /* ---- Cor da marca (substitui o azul do iOS, como o guia manda) ----
+     --brand  : o caramelo original do Copo de Cookie (só para logo/decoração)
+     --accent : versão um pouco mais escura, que passa no teste de contraste
+                para texto e ícones sobre fundo claro (mín. 4,5:1) */
+  --brand:        #B5651D;
+  --accent:       #9E5A16;
+  --accent-fill:  #9E5A16;
+  --on-accent:    #FFFFFF;
+  --accent-tint:  rgba(158, 90, 22, 0.12);
+
+  /* ---- Cores de status legíveis como TEXTO (as de sistema são claras demais) ---- */
+  --green-text:  #1B7A32;
+  --red-text:    #D70015;
+  --orange-text: #A34700;
+  --green-tint:  rgba(52, 199, 89, 0.16);
+  --red-tint:    rgba(255, 59, 48, 0.13);
+  --orange-tint: rgba(255, 149, 0, 0.16);
+  --yellow-tint: rgba(255, 204, 0, 0.24);
+
+  /* ---- Cores dos gráficos ---- */
+  --chart-1: #B5651D;
+  --chart-2: #6B4A2B;
+  --chart-3: #E0A030;
+  --chart-grid: rgba(60, 60, 67, 0.12);
+
+  /* ---- Vidro (Liquid Glass) ---- */
+  --glass-bg:     rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.40);
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --backdrop:     rgba(0, 0, 0, 0.40);
+  --seg-thumb:    #FFFFFF;
+
+  /* ---- Tipografia ---- */
+  --font: -apple-system, BlinkMacSystemFont, system-ui, "Inter",
+          "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* ---- Espaçamento (múltiplos de 4 e 8) ---- */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px;
+  --page-x: 16px;
+  --page-max: 100%;
+
+  /* ---- Cantos ---- */
+  --r-field: 12px;   /* campos de texto e busca */
+  --r-group: 16px;   /* grupos de lista e cartões */
+  --r-sheet: 26px;   /* painéis que sobem de baixo */
+  --r-pill:  999px;  /* botões principais */
+
+  /* ---- Movimento: curva de "mola" do iOS ---- */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur: 0.4s;
+  color-scheme: light;
+}
+[data-theme="dark"] {
+    --blue: #0A84FF;   --green: #30D158;  --red: #FF453A;    --orange: #FF9F0A;
+    --yellow: #FFD60A; --pink: #FF375F;   --purple: #BF5AF2; --indigo: #5E5CE6;
+    --teal: #40CBE0;   --mint: #63E6E2;   --cyan: #64D2FF;   --brown: #AC8E68;
+
+    --bg:                #000000;
+    --bg-secondary:      #1C1C1E;
+    --bg-tertiary:       #2C2C2E;
+    --bg-grouped:           #000000;
+    --bg-grouped-secondary: #1C1C1E;
+    --bg-grouped-tertiary:  #2C2C2E;
+
+    --label:            #FFFFFF;
+    --label-secondary:  rgba(235, 235, 245, 0.60);
+    --label-tertiary:   rgba(235, 235, 245, 0.30);
+    --label-quaternary: rgba(235, 235, 245, 0.16);
+
+    --separator:        rgba(84, 84, 88, 0.60);
+    --separator-opaque: #38383A;
+
+    --fill:            rgba(120, 120, 128, 0.36);
+    --fill-secondary:  rgba(120, 120, 128, 0.32);
+    --fill-tertiary:   rgba(118, 118, 128, 0.24);
+    --fill-quaternary: rgba(116, 116, 128, 0.18);
+
+    --gray:  #8E8E93;
+    --gray2: #636366;
+    --gray3: #48484A;
+    --gray4: #3A3A3C;
+    --gray5: #2C2C2E;
+    --gray6: #1C1C1E;
+
+    --accent:      #F0A75E;
+    --accent-fill: #A9601A;
+    --on-accent:   #FFFFFF;
+    --accent-tint: rgba(240, 167, 94, 0.16);
+
+    --green-text:  #30D158;
+    --red-text:    #FF453A;
+    --orange-text: #FF9F0A;
+    --green-tint:  rgba(48, 209, 88, 0.18);
+    --red-tint:    rgba(255, 69, 58, 0.18);
+    --orange-tint: rgba(255, 159, 10, 0.18);
+    --yellow-tint: rgba(255, 214, 10, 0.20);
+
+    --chart-1: #E0913F;
+    --chart-2: #C9A27A;
+    --chart-3: #FFD60A;
+    --chart-grid: rgba(235, 235, 245, 0.14);
+
+    --glass-bg:     rgba(30, 30, 30, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    --backdrop:     rgba(0, 0, 0, 0.60);
+    --seg-thumb:    #636366;
+  color-scheme: dark;
+}
+@media (min-width: 700px) { :root { --page-x: 20px; } }
+
+/* =====================================================================
+   COMPONENTES iOS — genéricos (usados no app e no /styleguide)
+   ===================================================================== */
+
+/* ---------- Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg-grouped);
+  color: var(--label);
+  font-family: var(--font);
+  font-size: 17px; line-height: 22px; letter-spacing: -0.4px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 100vh; min-height: 100dvh;
+}
+button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+svg.lucide { width: 20px; height: 20px; stroke-width: 2; flex-shrink: 0; }
+i[data-lucide] { display: inline-block; width: 20px; height: 20px; flex-shrink: 0; vertical-align: -4px; }
+.btn i[data-lucide], .btn svg.lucide, button i[data-lucide], button svg.lucide { vertical-align: middle; }
+
+/* ---------- Tipografia (escala oficial do iOS) ---------- */
+.t-large-title { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.4px; }
+.t-title1   { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: 0.36px; }
+.t-title2   { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: 0.35px; }
+.t-title3   { font-size: 20px; line-height: 25px; font-weight: 600; letter-spacing: 0.38px; }
+.t-headline { font-size: 17px; line-height: 22px; font-weight: 600; }
+.t-body     { font-size: 17px; line-height: 22px; font-weight: 400; }
+.t-callout  { font-size: 16px; line-height: 21px; font-weight: 400; letter-spacing: -0.32px; }
+.t-subhead  { font-size: 15px; line-height: 20px; font-weight: 400; letter-spacing: -0.24px; }
+.t-footnote { font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: -0.08px; }
+.t-caption1 { font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: 0; }
+.t-caption2 { font-size: 11px; line-height: 13px; font-weight: 400; letter-spacing: 0.06px; }
+
+/* ---------- Vidro (Liquid Glass) ---------- */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid var(--glass-border);
+}
+
+/* ---------- Efeito de toque (nunca o azul do navegador) ---------- */
+.pressable, button, .list-row { transition: transform var(--dur) var(--ease), opacity 0.2s var(--ease), background-color 0.2s var(--ease); }
+.pressable:active, button:active { transform: scale(0.97); opacity: 0.7; }
+button:disabled { opacity: 0.4; pointer-events: none; }
+
+/* ---------- Barra de navegação (título grande que encolhe) ---------- */
+.navbar { position: sticky; top: 0; z-index: 40; padding-top: env(safe-area-inset-top); }
+.navbar::before {
+  content: ""; position: absolute; inset: 0;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 0.5px solid var(--separator);
+  opacity: 0; transition: opacity 0.25s var(--ease);
+}
+.navbar.collapsed::before { opacity: 1; }
+.navbar-row {
+  position: relative; height: 52px;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 var(--page-x);
+  max-width: var(--page-max); margin: 0 auto;
+}
+.nav-title {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 50%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 17px; line-height: 22px; font-weight: 600;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s var(--ease);
+}
+.navbar.collapsed .nav-title { opacity: 1; }
+.nav-actions { display: flex; gap: 10px; }
+.nav-btn {
+  position: relative; width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center; padding: 0;
+  color: var(--accent); cursor: pointer;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+.nav-btn svg.lucide, .nav-btn i[data-lucide] { width: 22px; height: 22px; }
+.nav-badge {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--red); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px;
+  display: flex; align-items: center; justify-content: center; letter-spacing: 0;
+}
+.large-title { margin: 0; padding: 2px 0 14px; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.4px; }
+
+/* ---------- Tab bar flutuante (cápsula de vidro, iOS 26) ---------- */
+.tabbar {
+  position: fixed; z-index: 45;
+  left: 50%; transform: translateX(-50%);
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  width: min(calc(100% - 32px), 460px);
+  display: flex; gap: 2px; padding: 6px;
+  border-radius: var(--r-pill);
+  box-shadow: var(--glass-shadow);
+}
+.tab-item {
+  flex: 1; min-width: 0; height: 52px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 0; border-radius: var(--r-pill); background: transparent;
+  color: var(--label-secondary);
+  font-size: 11px; line-height: 13px; font-weight: 500; letter-spacing: 0.06px;
+  cursor: pointer;
+}
+.tab-item svg.lucide, .tab-item i[data-lucide] { width: 24px; height: 24px; }
+.tab-item.active { color: var(--accent); background: var(--fill-tertiary); }
+.tab-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Lista agrupada (estilo Ajustes) ---------- */
+.list-header { padding: 0 16px 6px; font-size: 13px; line-height: 18px; letter-spacing: -0.08px; color: var(--label-secondary); }
+.list-footer { padding: 6px 16px 0; font-size: 13px; line-height: 18px; letter-spacing: -0.08px; color: var(--label-secondary); }
+.list-section { margin-bottom: 24px; }
+.list-group { background: var(--bg-grouped-secondary); border-radius: var(--r-group); overflow: hidden; }
+.list-row {
+  position: relative; display: flex; align-items: center; gap: 12px;
+  min-height: 44px; padding: 0 16px; cursor: pointer;
+}
+.list-row.has-icon { --sep-inset: 57px; }
+.list-row + .list-row::before {
+  content: ""; position: absolute; top: 0; right: 0; left: var(--sep-inset, 16px);
+  height: 0.5px; background: var(--separator);
+}
+.list-row:active { background: var(--fill-quaternary); transform: none; opacity: 1; }
+.row-icon {
+  width: 29px; height: 29px; border-radius: 7px; flex-shrink: 0;
+  display: grid; place-items: center; color: #fff; background: var(--tint, var(--gray));
+}
+.row-icon svg.lucide, .row-icon i[data-lucide] { width: 18px; height: 18px; }
+.row-label { flex: 1; min-width: 0; padding: 11px 0; }
+.row-detail { color: var(--label-secondary); }
+.row-chevron { color: var(--gray3); width: 16px !important; height: 16px !important; stroke-width: 2.6 !important; margin-right: -4px; }
+.list-row.destructive .row-label { color: var(--red-text); }
+
+/* ---------- Botões ---------- */
+.btn, button.primary, button.secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 20px; border: 0; border-radius: var(--r-pill);
+  font: 600 17px/22px var(--font); letter-spacing: -0.4px; cursor: pointer;
+}
+.btn-filled, button.primary { background: var(--accent-fill); color: var(--on-accent); }
+.btn-gray, button.secondary { background: var(--fill-tertiary); color: var(--accent); }
+.btn-plain { background: transparent; color: var(--accent); }
+.btn-destructive { background: transparent; color: var(--red-text); }
+.btn-destructive-filled { background: var(--red); color: #fff; }
+button.primary, button.secondary { width: 100%; min-height: 50px; margin-top: 8px; }
+.btn-sm { min-height: 36px; padding: 0 14px; font-size: 15px; }
+
+/* ---------- Toggle (interruptor) 51×31 ---------- */
+input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none;
+  position: relative; flex-shrink: 0; margin: 0;
+  width: 51px !important; height: 31px; padding: 0;
+  border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--fill-secondary);
+  transition: background-color 0.3s var(--ease);
+}
+input[type="checkbox"]::before {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 27px; height: 27px; border-radius: 50%; background: #fff;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15), 0 1px 1px rgba(0,0,0,0.16), 0 3px 1px rgba(0,0,0,0.10);
+  transition: transform 0.3s var(--ease);
+}
+input[type="checkbox"]:checked { background: var(--green); }
+input[type="checkbox"]:checked::before { transform: translateX(20px); }
+
+/* ---------- Segmented control (cápsula cinza com fundo deslizante) ---------- */
+.segmented {
+  --n: 2; --i: 0; --seg-on: 1;
+  position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  padding: 2px; border-radius: 10px; background: var(--fill-tertiary);
+}
+.segmented::before {
+  content: ""; position: absolute; top: 2px; bottom: 2px; left: 2px;
+  width: calc((100% - 4px) / var(--n)); border-radius: 8px;
+  background: var(--seg-thumb);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12), 0 3px 1px rgba(0,0,0,0.04);
+  transform: translateX(calc(var(--i) * 100%));
+  opacity: var(--seg-on);
+  transition: transform 0.35s var(--ease), opacity 0.2s var(--ease);
+}
+.segmented > button {
+  position: relative; z-index: 1; min-height: 32px; padding: 0 8px;
+  border: 0; background: transparent; border-radius: 8px;
+  font: 500 13px/18px var(--font); letter-spacing: -0.08px; color: var(--label);
+  cursor: pointer;
+}
+.segmented > button.selected { font-weight: 600; }
+.segmented > button:active { transform: none; opacity: 0.6; }
+
+/* ---------- Campo de busca ---------- */
+.search-field, .client-search-wrap > input:not([type="checkbox"]) {
+  width: 100%; min-height: 36px; border: 0; border-radius: 10px;
+  padding: 7px 12px 7px 34px;
+  font: 400 17px/22px var(--font); letter-spacing: -0.4px; color: var(--label);
+  background-color: var(--fill-tertiary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 10px center; background-size: 17px;
+}
+
+/* ---------- Campos de formulário (lista agrupada) ---------- */
+.field-group { background: var(--bg-grouped-secondary); border-radius: var(--r-group); overflow: hidden; }
+.field-group > div { position: relative; padding: 10px 16px; }
+.field-group > div + div::before {
+  content: ""; position: absolute; top: 0; right: 0; left: 16px; height: 0.5px; background: var(--separator);
+}
+label { display: block; margin: 0 0 2px; font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: -0.08px; color: var(--label-secondary); }
+input:not([type="checkbox"]), select, textarea {
+  width: 100%; margin: 0; padding: 2px 0; border: 0; border-radius: 0; outline: none;
+  background: transparent; color: var(--label);
+  font: 400 17px/22px var(--font); letter-spacing: -0.4px;
+}
+textarea { resize: vertical; min-height: 44px; }
+input::placeholder, textarea::placeholder { color: var(--label-tertiary); }
+input[type="date"] { min-height: 26px; }
+select {
+  -webkit-appearance: none; appearance: none; padding-right: 26px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0 center; background-size: 18px;
+}
+
+/* ---------- Sheet (painel que sobe de baixo) ---------- */
+.sheet-overlay, .modal-overlay {
+  position: fixed; inset: 0; z-index: 60; display: none;
+  align-items: flex-end; justify-content: center;
+  background: var(--backdrop);
+}
+.sheet-overlay.open, .modal-overlay.open { display: flex; animation: fadeIn 0.3s var(--ease); }
+.sheet, .modal-sheet {
+  position: relative; width: 100%; max-width: 560px; max-height: 92vh; max-height: 92dvh;
+  overflow-y: auto; overscroll-behavior: contain;
+  background: var(--bg-grouped);
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+  animation: sheetUp 0.45s var(--ease);
+  touch-action: pan-y;
+}
+.sheet::before, .modal-sheet::before {
+  content: ""; position: absolute; top: 8px; left: 50%; width: 36px; height: 5px;
+  margin-left: -18px; border-radius: 3px; background: var(--gray3);
+}
+.sheet-header, .modal-header {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  min-height: 44px; margin-bottom: 8px;
+}
+.sheet-title, .modal-title { font-size: 17px; line-height: 22px; font-weight: 600; text-align: center; padding: 0 44px; }
+.sheet-close, .modal-close {
+  position: absolute; right: 0; top: 4px; width: 36px; height: 36px; padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: 50%; cursor: pointer;
+  background: var(--fill-tertiary); color: var(--label-secondary);
+}
+.sheet-close svg.lucide, .modal-close svg.lucide, .modal-close i[data-lucide] { width: 18px; height: 18px; }
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- Alerta (estilo dos avisos do iPhone) ---------- */
+.ios-alert-overlay { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: var(--backdrop); padding: 24px; }
+.ios-alert {
+  width: 270px; border-radius: 14px; overflow: hidden; text-align: center;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%);
+  animation: alertIn 0.35s var(--ease);
+}
+.ios-alert-body { padding: 20px 16px 16px; }
+.ios-alert-title { font-size: 17px; line-height: 22px; font-weight: 600; }
+.ios-alert-msg { margin-top: 2px; font-size: 13px; line-height: 18px; letter-spacing: -0.08px; }
+.ios-alert-actions { display: flex; border-top: 0.5px solid var(--separator); }
+.ios-alert-actions button {
+  flex: 1; min-height: 44px; border: 0; background: transparent; color: var(--accent);
+  font: 400 17px/22px var(--font); letter-spacing: -0.4px; cursor: pointer;
+}
+.ios-alert-actions button + button { border-left: 0.5px solid var(--separator); }
+.ios-alert-actions button.strong { font-weight: 600; }
+.ios-alert-actions button.danger { color: var(--red-text); }
+.ios-alert-actions button:active { transform: none; background: var(--fill-tertiary); opacity: 1; }
+@keyframes alertIn { from { transform: scale(1.12); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ---------- Action sheet ---------- */
+.action-sheet { width: min(100% - 16px, 420px); display: flex; flex-direction: column; gap: 8px; margin-bottom: calc(8px + env(safe-area-inset-bottom)); animation: sheetUp 0.45s var(--ease); }
+.action-sheet-group { border-radius: 14px; overflow: hidden; background: var(--glass-bg); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%); }
+.action-sheet-title { padding: 14px 16px; text-align: center; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--label-secondary); border-bottom: 0.5px solid var(--separator); }
+.action-sheet button { width: 100%; min-height: 57px; border: 0; background: transparent; color: var(--accent); font: 400 20px/25px var(--font); letter-spacing: 0.38px; cursor: pointer; }
+.action-sheet .action-sheet-group button + button { border-top: 0.5px solid var(--separator); }
+.action-sheet button.danger { color: var(--red-text); }
+.action-sheet button.cancel { font-weight: 600; }
+.action-sheet button:active { transform: none; opacity: 1; background: var(--fill-tertiary); }
+
+/* ---------- Respeitar quem desligou as animações ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+
+.sg-page { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+.sg-top h1 { margin: 0 0 4px; font-size: 28px; line-height: 34px; letter-spacing: 0.36px; }
+.sg-top p { margin: 0 0 20px; color: var(--label-secondary); font-size: 15px; line-height: 20px; }
+.sg-frames { display: grid; grid-template-columns: 1fr; gap: 20px; }
+@media (min-width: 900px) { .sg-frames { grid-template-columns: 1fr 1fr; } }
+.sg-frame { background: var(--bg-grouped); color: var(--label); border-radius: 28px; padding: 20px 16px 28px; border: 0.5px solid var(--separator); }
+.sg-h { margin: 0 0 16px 4px; font-size: 20px; line-height: 25px; font-weight: 600; letter-spacing: 0.38px; }
+.sg-block { margin-bottom: 26px; }
+.card-sg { background: var(--bg-grouped-secondary); border-radius: var(--r-group); padding: 16px; }
+.card-sg > div + div { margin-top: 6px; }
+.sg-swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.sg-sw { font-size: 12px; line-height: 16px; color: var(--label-secondary); display: flex; align-items: center; gap: 8px; }
+.sg-sw span { width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; border: 0.5px solid var(--separator); }
+.sg-nav { padding: 8px 16px 8px; } .sg-nav .navbar-row { height: 52px; position: relative; }
+.sg-bg { background: linear-gradient(135deg, #f6b86b, #d76d3a 60%, #7a3b1d); padding: 28px 12px; }
+.sg-static-tabbar { position: relative !important; left: auto !important; bottom: auto !important; transform: none !important; width: 100% !important; }
+.sg-stack { display: flex; flex-direction: column; gap: 12px; }
+.sg-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.sg-seg { max-width: 100%; }
+.sg-sheet-demo { animation: none; max-width: none; border-radius: var(--r-sheet); padding-top: 26px; }
+.sg-glass-bg { border-radius: var(--r-group); padding: 36px 16px; background: linear-gradient(120deg, #34C759, #007AFF 55%, #AF52DE); }
+.sg-glass-card { padding: 16px; border-radius: 18px; text-align: center; font-size: 15px; }
+.sg-theme-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+
+</style>
+</head>
+<body>
+<div class="sg-page">
+  <div class="sg-top">
+    <h1>Guia de componentes</h1>
+    <p>Todos os componentes do visual iOS do Copo de Cookie, lado a lado nos modos claro e escuro. É daqui que saem as telas reais do site (mesmos tokens, mesmo CSS).</p>
+  </div>
+  <div class="sg-frames">
+    
+<section class="sg-frame" data-theme="light">
+  <h2 class="sg-h">Modo claro</h2>
+
+  <div class="sg-block">
+    <div class="list-header">1 · Tipografia (escala oficial do iOS)</div>
+    <div class="card-sg">
+      <div class="t-large-title">Large Title 34</div>
+      <div class="t-title1">Title 1 · 28</div>
+      <div class="t-title2">Title 2 · 22</div>
+      <div class="t-title3">Title 3 · 20</div>
+      <div class="t-headline">Headline · 17 semibold</div>
+      <div class="t-body">Body · 17 — texto padrão das telas</div>
+      <div class="t-callout">Callout · 16</div>
+      <div class="t-subhead">Subheadline · 15</div>
+      <div class="t-footnote" style="color:var(--label-secondary)">Footnote · 13</div>
+      <div class="t-caption1" style="color:var(--label-secondary)">Caption 1 · 12</div>
+      <div class="t-caption2" style="color:var(--label-secondary)">Caption 2 · 11</div>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">2 · Cores</div>
+    <div class="card-sg"><div class="sg-swatches"><div class="sg-sw"><span style="background:var(--blue)"></span>blue</div><div class="sg-sw"><span style="background:var(--green)"></span>green</div><div class="sg-sw"><span style="background:var(--red)"></span>red</div><div class="sg-sw"><span style="background:var(--orange)"></span>orange</div><div class="sg-sw"><span style="background:var(--yellow)"></span>yellow</div><div class="sg-sw"><span style="background:var(--pink)"></span>pink</div><div class="sg-sw"><span style="background:var(--purple)"></span>purple</div><div class="sg-sw"><span style="background:var(--indigo)"></span>indigo</div><div class="sg-sw"><span style="background:var(--teal)"></span>teal</div><div class="sg-sw"><span style="background:var(--mint)"></span>mint</div><div class="sg-sw"><span style="background:var(--cyan)"></span>cyan</div><div class="sg-sw"><span style="background:var(--brown)"></span>brown</div><div class="sg-sw"><span style="background:var(--brand)"></span>brand</div><div class="sg-sw"><span style="background:var(--accent)"></span>accent</div><div class="sg-sw"><span style="background:var(--gray)"></span>gray</div><div class="sg-sw"><span style="background:var(--gray3)"></span>gray3</div><div class="sg-sw"><span style="background:var(--gray5)"></span>gray5</div></div>
+      <div class="list-footer" style="padding:8px 0 0">A cor da marca (caramelo) substitui o azul do iOS. Cores de sistema ficam para status e ícones.</div></div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">3 · Barra de navegação (título grande + vidro)</div>
+    <div class="card-sg sg-nav">
+      <div class="navbar-row" style="max-width:none;padding:0"><div class="nav-title" style="opacity:1">Pedidos</div>
+        <div class="nav-actions"><button class="nav-btn"><i data-lucide="bell"></i><span class="nav-badge">2</span></button><button class="nav-btn"><i data-lucide="more-horizontal"></i></button></div></div>
+      <h1 class="large-title" style="padding-bottom:0">Pedidos</h1>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">4 · Tab bar flutuante (cápsula de vidro)</div>
+    <div class="card-sg sg-bg">
+      <nav class="tabbar glass sg-static-tabbar">
+        <button class="tab-item active"><i data-lucide="clipboard-list"></i><span>Pedidos</span></button>
+        <button class="tab-item"><i data-lucide="calendar"></i><span>Calendário</span></button>
+        <button class="tab-item"><i data-lucide="boxes"></i><span>Estoque</span></button>
+        <button class="tab-item"><i data-lucide="bar-chart-3"></i><span>Vendas</span></button>
+        <button class="tab-item"><i data-lucide="users"></i><span>Clientes</span></button>
+      </nav>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">5 · Lista agrupada (estilo Ajustes)</div>
+    <div class="list-group">
+      <div class="list-row has-icon"><span class="row-icon" style="--tint:var(--orange)"><i data-lucide="clipboard-list"></i></span><span class="row-label">Pedidos</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+      <div class="list-row has-icon"><span class="row-icon" style="--tint:var(--red)"><i data-lucide="calendar"></i></span><span class="row-label">Calendário</span><span class="row-detail">30/09</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+      <div class="list-row has-icon"><span class="row-icon" style="--tint:var(--green)"><i data-lucide="bar-chart-3"></i></span><span class="row-label">Vendas</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+    </div>
+    <div class="list-footer">Rodapé explicativo do grupo, em texto pequeno e cinza.</div>
+    <div class="list-group" style="margin-top:16px"><div class="list-row has-icon destructive"><span class="row-icon" style="--tint:var(--red)"><i data-lucide="log-out"></i></span><span class="row-label">Sair</span></div></div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">6 · Botões</div>
+    <div class="card-sg sg-stack">
+      <button class="btn btn-filled" style="width:100%">Preenchido</button>
+      <button class="btn btn-gray" style="width:100%">Cinza</button>
+      <button class="btn btn-plain" style="width:100%">Só texto</button>
+      <button class="btn btn-destructive" style="width:100%">Destrutivo</button>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">7 · Toggle (interruptor 51×31)</div>
+    <div class="list-group">
+      <div class="list-row"><span class="row-label">Ligado</span><input type="checkbox" checked></div>
+      <div class="list-row"><span class="row-label">Desligado</span><input type="checkbox"></div>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">8 · Segmented control</div>
+    <div class="segmented sg-seg" style="--n:3">
+      <button class="selected">Dia</button><button>Semana</button><button>Mês</button>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">9 · Campo de busca e campos de formulário</div>
+    <div class="client-search-wrap" style="margin-bottom:12px"><input type="text" placeholder="Buscar cliente…"></div>
+    <div class="field-group">
+      <div><label>Nome</label><input type="text" placeholder="Ex: Maria Souza"></div>
+      <div><label>Telefone</label><input type="tel" placeholder="(24) 99999-0000"></div>
+      <div><label>Unidade</label><select><option>g</option><option>kg</option></select></div>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">10 · Sheet, alerta e action sheet</div>
+    <div class="sg-stack">
+      <div class="sheet sg-sheet-demo">
+        <div class="sheet-header"><div class="sheet-title">Tentativa de venda</div><button class="sheet-close"><i data-lucide="x"></i></button></div>
+        <div class="list-group"><div class="list-row has-icon"><span class="row-icon" style="--tint:var(--green)"><i data-lucide="phone"></i></span><span class="row-label">Ligar para Maria</span><i data-lucide="chevron-right" class="row-chevron"></i></div></div>
+      </div>
+      <div class="ios-alert" style="margin:0 auto">
+        <div class="ios-alert-body"><div class="ios-alert-title">Remover pedido?</div><div class="ios-alert-msg">Essa ação não pode ser desfeita.</div></div>
+        <div class="ios-alert-actions"><button>Cancelar</button><button class="strong danger">Remover</button></div>
+      </div>
+      <div class="action-sheet" style="margin:0 auto;animation:none;width:100%">
+        <div class="action-sheet-group"><div class="action-sheet-title">Pedido de Maria</div><button>Editar</button><button class="danger">Remover</button></div>
+        <div class="action-sheet-group"><button class="cancel">Cancelar</button></div>
+      </div>
+      <div class="sg-row">
+        <button class="btn btn-gray btn-sm" data-open="sheet">Abrir sheet</button>
+        <button class="btn btn-gray btn-sm" data-open="alert">Abrir alerta</button>
+        <button class="btn btn-gray btn-sm" data-open="action">Abrir action sheet</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">Vidro (Liquid Glass) sobre um fundo colorido</div>
+    <div class="sg-glass-bg"><div class="glass sg-glass-card">Barra com desfoque e leve transparência</div></div>
+  </div>
+</section>
+    
+<section class="sg-frame" data-theme="dark">
+  <h2 class="sg-h">Modo escuro</h2>
+
+  <div class="sg-block">
+    <div class="list-header">1 · Tipografia (escala oficial do iOS)</div>
+    <div class="card-sg">
+      <div class="t-large-title">Large Title 34</div>
+      <div class="t-title1">Title 1 · 28</div>
+      <div class="t-title2">Title 2 · 22</div>
+      <div class="t-title3">Title 3 · 20</div>
+      <div class="t-headline">Headline · 17 semibold</div>
+      <div class="t-body">Body · 17 — texto padrão das telas</div>
+      <div class="t-callout">Callout · 16</div>
+      <div class="t-subhead">Subheadline · 15</div>
+      <div class="t-footnote" style="color:var(--label-secondary)">Footnote · 13</div>
+      <div class="t-caption1" style="color:var(--label-secondary)">Caption 1 · 12</div>
+      <div class="t-caption2" style="color:var(--label-secondary)">Caption 2 · 11</div>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">2 · Cores</div>
+    <div class="card-sg"><div class="sg-swatches"><div class="sg-sw"><span style="background:var(--blue)"></span>blue</div><div class="sg-sw"><span style="background:var(--green)"></span>green</div><div class="sg-sw"><span style="background:var(--red)"></span>red</div><div class="sg-sw"><span style="background:var(--orange)"></span>orange</div><div class="sg-sw"><span style="background:var(--yellow)"></span>yellow</div><div class="sg-sw"><span style="background:var(--pink)"></span>pink</div><div class="sg-sw"><span style="background:var(--purple)"></span>purple</div><div class="sg-sw"><span style="background:var(--indigo)"></span>indigo</div><div class="sg-sw"><span style="background:var(--teal)"></span>teal</div><div class="sg-sw"><span style="background:var(--mint)"></span>mint</div><div class="sg-sw"><span style="background:var(--cyan)"></span>cyan</div><div class="sg-sw"><span style="background:var(--brown)"></span>brown</div><div class="sg-sw"><span style="background:var(--brand)"></span>brand</div><div class="sg-sw"><span style="background:var(--accent)"></span>accent</div><div class="sg-sw"><span style="background:var(--gray)"></span>gray</div><div class="sg-sw"><span style="background:var(--gray3)"></span>gray3</div><div class="sg-sw"><span style="background:var(--gray5)"></span>gray5</div></div>
+      <div class="list-footer" style="padding:8px 0 0">A cor da marca (caramelo) substitui o azul do iOS. Cores de sistema ficam para status e ícones.</div></div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">3 · Barra de navegação (título grande + vidro)</div>
+    <div class="card-sg sg-nav">
+      <div class="navbar-row" style="max-width:none;padding:0"><div class="nav-title" style="opacity:1">Pedidos</div>
+        <div class="nav-actions"><button class="nav-btn"><i data-lucide="bell"></i><span class="nav-badge">2</span></button><button class="nav-btn"><i data-lucide="more-horizontal"></i></button></div></div>
+      <h1 class="large-title" style="padding-bottom:0">Pedidos</h1>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">4 · Tab bar flutuante (cápsula de vidro)</div>
+    <div class="card-sg sg-bg">
+      <nav class="tabbar glass sg-static-tabbar">
+        <button class="tab-item active"><i data-lucide="clipboard-list"></i><span>Pedidos</span></button>
+        <button class="tab-item"><i data-lucide="calendar"></i><span>Calendário</span></button>
+        <button class="tab-item"><i data-lucide="boxes"></i><span>Estoque</span></button>
+        <button class="tab-item"><i data-lucide="bar-chart-3"></i><span>Vendas</span></button>
+        <button class="tab-item"><i data-lucide="users"></i><span>Clientes</span></button>
+      </nav>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">5 · Lista agrupada (estilo Ajustes)</div>
+    <div class="list-group">
+      <div class="list-row has-icon"><span class="row-icon" style="--tint:var(--orange)"><i data-lucide="clipboard-list"></i></span><span class="row-label">Pedidos</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+      <div class="list-row has-icon"><span class="row-icon" style="--tint:var(--red)"><i data-lucide="calendar"></i></span><span class="row-label">Calendário</span><span class="row-detail">30/09</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+      <div class="list-row has-icon"><span class="row-icon" style="--tint:var(--green)"><i data-lucide="bar-chart-3"></i></span><span class="row-label">Vendas</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+    </div>
+    <div class="list-footer">Rodapé explicativo do grupo, em texto pequeno e cinza.</div>
+    <div class="list-group" style="margin-top:16px"><div class="list-row has-icon destructive"><span class="row-icon" style="--tint:var(--red)"><i data-lucide="log-out"></i></span><span class="row-label">Sair</span></div></div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">6 · Botões</div>
+    <div class="card-sg sg-stack">
+      <button class="btn btn-filled" style="width:100%">Preenchido</button>
+      <button class="btn btn-gray" style="width:100%">Cinza</button>
+      <button class="btn btn-plain" style="width:100%">Só texto</button>
+      <button class="btn btn-destructive" style="width:100%">Destrutivo</button>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">7 · Toggle (interruptor 51×31)</div>
+    <div class="list-group">
+      <div class="list-row"><span class="row-label">Ligado</span><input type="checkbox" checked></div>
+      <div class="list-row"><span class="row-label">Desligado</span><input type="checkbox"></div>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">8 · Segmented control</div>
+    <div class="segmented sg-seg" style="--n:3">
+      <button class="selected">Dia</button><button>Semana</button><button>Mês</button>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">9 · Campo de busca e campos de formulário</div>
+    <div class="client-search-wrap" style="margin-bottom:12px"><input type="text" placeholder="Buscar cliente…"></div>
+    <div class="field-group">
+      <div><label>Nome</label><input type="text" placeholder="Ex: Maria Souza"></div>
+      <div><label>Telefone</label><input type="tel" placeholder="(24) 99999-0000"></div>
+      <div><label>Unidade</label><select><option>g</option><option>kg</option></select></div>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">10 · Sheet, alerta e action sheet</div>
+    <div class="sg-stack">
+      <div class="sheet sg-sheet-demo">
+        <div class="sheet-header"><div class="sheet-title">Tentativa de venda</div><button class="sheet-close"><i data-lucide="x"></i></button></div>
+        <div class="list-group"><div class="list-row has-icon"><span class="row-icon" style="--tint:var(--green)"><i data-lucide="phone"></i></span><span class="row-label">Ligar para Maria</span><i data-lucide="chevron-right" class="row-chevron"></i></div></div>
+      </div>
+      <div class="ios-alert" style="margin:0 auto">
+        <div class="ios-alert-body"><div class="ios-alert-title">Remover pedido?</div><div class="ios-alert-msg">Essa ação não pode ser desfeita.</div></div>
+        <div class="ios-alert-actions"><button>Cancelar</button><button class="strong danger">Remover</button></div>
+      </div>
+      <div class="action-sheet" style="margin:0 auto;animation:none;width:100%">
+        <div class="action-sheet-group"><div class="action-sheet-title">Pedido de Maria</div><button>Editar</button><button class="danger">Remover</button></div>
+        <div class="action-sheet-group"><button class="cancel">Cancelar</button></div>
+      </div>
+      <div class="sg-row">
+        <button class="btn btn-gray btn-sm" data-open="sheet">Abrir sheet</button>
+        <button class="btn btn-gray btn-sm" data-open="alert">Abrir alerta</button>
+        <button class="btn btn-gray btn-sm" data-open="action">Abrir action sheet</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sg-block">
+    <div class="list-header">Vidro (Liquid Glass) sobre um fundo colorido</div>
+    <div class="sg-glass-bg"><div class="glass sg-glass-card">Barra com desfoque e leve transparência</div></div>
+  </div>
+</section>
+  </div>
+</div>
+
+<script>
+// Ícones
+function refreshIcons() { if (window.lucide) window.lucide.createIcons(); }
+window.addEventListener('load', refreshIcons);
+window.addEventListener('lucide-ready', refreshIcons);
+
+// Segmented: desliza o fundo branco até o botão tocado
+document.querySelectorAll('.segmented').forEach(seg => {
+  const btns = Array.from(seg.querySelectorAll('button'));
+  seg.style.setProperty('--n', btns.length);
+  btns.forEach((b, i) => b.addEventListener('click', () => {
+    btns.forEach(x => x.classList.remove('selected'));
+    b.classList.add('selected');
+    seg.style.setProperty('--i', i);
+  }));
+});
+
+// Abrir sheet / alerta / action sheet de verdade (herdam o tema do quadro onde foram tocados)
+function openOverlay(kind, theme) {
+  const ov = document.createElement('div');
+  ov.setAttribute('data-theme', theme);
+  const close = () => ov.remove();
+  if (kind === 'sheet') {
+    ov.className = 'sheet-overlay open';
+    ov.innerHTML = '<div class="sheet"><div class="sheet-header"><div class="sheet-title">Sheet de exemplo</div><button class="sheet-close" aria-label="Fechar"><i data-lucide="x"></i></button></div><p class="t-subhead" style="color:var(--label-secondary)">Toque fora, no X ou aperte Esc para fechar.</p></div>';
+  } else if (kind === 'alert') {
+    ov.className = 'ios-alert-overlay';
+    ov.innerHTML = '<div class="ios-alert"><div class="ios-alert-body"><div class="ios-alert-title">Remover pedido?</div><div class="ios-alert-msg">Essa ação não pode ser desfeita.</div></div><div class="ios-alert-actions"><button data-x>Cancelar</button><button class="strong danger" data-x>Remover</button></div></div>';
+  } else {
+    ov.className = 'sheet-overlay open';
+    ov.innerHTML = '<div class="action-sheet"><div class="action-sheet-group"><div class="action-sheet-title">Pedido de Maria</div><button data-x>Editar</button><button class="danger" data-x>Remover</button></div><div class="action-sheet-group"><button class="cancel" data-x>Cancelar</button></div></div>';
+  }
+  ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('[data-x], .sheet-close')) close(); });
+  document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
+  document.body.appendChild(ov);
+  refreshIcons();
+}
+document.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
+  openOverlay(b.dataset.open, b.closest('.sg-frame').dataset.theme);
+}));
+</script>
+</body>
+</html>

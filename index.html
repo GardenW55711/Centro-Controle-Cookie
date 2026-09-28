@@ -2,380 +2,715 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Controle de Encomendas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Copo de Cookie">
+<title>Copo de Cookie</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Ícones Lucide (versão fixa; se o primeiro endereço falhar, tenta o segundo) -->
+<script src="https://unpkg.com/lucide@0.376.1/dist/umd/lucide.min.js" onerror="var l=document.createElement('script');l.src='https://cdn.jsdelivr.net/npm/lucide@0.376.1/dist/umd/lucide.min.js';l.onload=function(){window.dispatchEvent(new Event('lucide-ready'))};document.head.appendChild(l)"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #FAF7F2;
-    margin: 0;
-    padding: 16px;
-    color: #3D2B1F;
-  }
-  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-  h1 { font-size: 20px; margin: 0; color: #5C3A21; }
-  .subtitle { font-size: 13px; color: #8A7160; margin-bottom: 16px; }
-  .current-tab {
-    display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700;
-    color: #B5651D; background: #FCEEDD; border-radius: 20px; padding: 6px 12px;
-    width: fit-content; margin-bottom: 16px;
-  }
-  .kebab-btn {
-    border: none; background: white; width: 38px; height: 38px; border-radius: 10px;
-    font-size: 18px; color: #5C3A21; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    flex-shrink: 0;
-  }
+/* =====================================================================
+   DESIGN TOKENS — Copo de Cookie (visual iOS)
+   Baseado no DESIGN-IOS.md. Nunca use cores "soltas": sempre use estas
+   variáveis, assim o modo escuro funciona sozinho.
+   ===================================================================== */
+:root {
+  color-scheme: light dark;
 
-  .view { display: none; }
-  .view.active { display: block; }
+  /* ---- Cores de sistema do iOS (modo claro) ---- */
+  --blue: #007AFF;   --green: #34C759;  --red: #FF3B30;    --orange: #FF9500;
+  --yellow: #FFCC00; --pink: #FF2D55;   --purple: #AF52DE; --indigo: #5856D6;
+  --teal: #30B0C7;   --mint: #00C7BE;   --cyan: #32ADE6;   --brown: #A2845E;
 
-  .card { background: white; border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-  .form-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-  label { font-size: 12px; font-weight: 600; color: #8A7160; display: block; margin-bottom: 4px; }
-  input, select, textarea {
-    width: 100%; padding: 10px; border: 1px solid #E4D9CC; border-radius: 8px;
-    font-size: 14px; background: #FFFDFB;
-  }
-  textarea { resize: vertical; min-height: 40px; }
+  /* ---- Fundos ---- */
+  --bg:                #FFFFFF;
+  --bg-secondary:      #F2F2F7;
+  --bg-tertiary:       #FFFFFF;
+  --bg-grouped:           #F2F2F7;
+  --bg-grouped-secondary: #FFFFFF;
+  --bg-grouped-tertiary:  #F2F2F7;
 
-  .price-wrap { display: flex; align-items: center; border: 1px solid #E4D9CC; border-radius: 8px; background: #FFFDFB; overflow: hidden; }
-  .price-prefix { padding: 10px 8px 10px 10px; font-size: 14px; font-weight: 700; color: #B5651D; }
-  .price-wrap input { border: none; padding: 10px 10px 10px 0; }
-  .price-wrap input:focus { outline: none; }
+  /* ---- Textos ---- */
+  --label:            #000000;
+  --label-secondary:  rgba(60, 60, 67, 0.60);
+  --label-tertiary:   rgba(60, 60, 67, 0.30);
+  --label-quaternary: rgba(60, 60, 67, 0.18);
 
-  .product-row {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    padding: 8px 0; border-bottom: 1px solid #F0E6D8;
-  }
-  .product-row:last-child { border-bottom: none; }
-  .product-name { font-size: 13px; flex: 1; }
-  .qty-control { display: flex; align-items: center; gap: 8px; }
-  .qty-control button {
-    width: 28px; height: 28px; border-radius: 50%; border: 1px solid #E4D9CC;
-    background: #FAF7F2; font-size: 15px; font-weight: 700; color: #B5651D; cursor: pointer; line-height: 1;
-  }
-  .qty-control span { min-width: 18px; text-align: center; font-weight: 700; font-size: 14px; }
+  /* ---- Linhas divisórias ---- */
+  --separator:        rgba(60, 60, 67, 0.29);
+  --separator-opaque: #C6C6C8;
 
-  button.primary {
-    background: #B5651D; color: white; border: none; padding: 12px; border-radius: 8px;
-    font-size: 15px; font-weight: 600; width: 100%; margin-top: 4px; cursor: pointer;
-  }
-  button.primary:active { opacity: 0.85; }
-  button.secondary {
-    background: #F0E6D8; color: #8A7160; border: none; padding: 12px; border-radius: 8px;
-    font-size: 14px; font-weight: 600; width: 100%; margin-top: 8px; cursor: pointer;
-  }
+  /* ---- Preenchimentos ---- */
+  --fill:            rgba(120, 120, 128, 0.20);
+  --fill-secondary:  rgba(120, 120, 128, 0.16);
+  --fill-tertiary:   rgba(118, 118, 128, 0.12);
+  --fill-quaternary: rgba(116, 116, 128, 0.08);
 
-  .order {
-    border-left: 4px solid #B5651D; background: white; border-radius: 10px;
-    padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  }
-  .order.entregue { border-left-color: #6B8F5A; opacity: 0.75; }
-  .order-top { display: flex; justify-content: space-between; align-items: flex-start; }
-  .order-client { font-weight: 700; font-size: 15px; }
-  .order-date { font-size: 12px; color: #B5651D; font-weight: 600; white-space: nowrap; }
-  .order-products { font-size: 13px; color: #5C3A21; margin-top: 4px; }
-  .order-delivery { font-size: 12px; color: #8A7160; margin-top: 3px; font-style: italic; }
-  .order-value { font-size: 13px; color: #5C3A21; margin-top: 4px; font-weight: 700; }
-  .order-meta { font-size: 11px; color: #A0917F; margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .order-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .order-actions button {
-    flex: 1; min-width: 100px; padding: 8px; border-radius: 6px;
-    border: 1px solid #E4D9CC; background: #FAF7F2; font-size: 12px; cursor: pointer;
-  }
-  .btn-done { color: #6B8F5A; font-weight: 600; }
-  .btn-pago { color: #B5651D; font-weight: 600; }
-  .btn-del { color: #B33A3A; }
+  /* ---- Cinzas ---- */
+  --gray:  #8E8E93;
+  --gray2: #AEAEB2;
+  --gray3: #C7C7CC;
+  --gray4: #D1D1D6;
+  --gray5: #E5E5EA;
+  --gray6: #F2F2F7;
 
-  .empty { text-align: center; color: #A0917F; font-size: 13px; padding: 24px 0; }
-  .section-title {
-    font-size: 13px; font-weight: 700; color: #8A7160; text-transform: uppercase;
-    letter-spacing: 0.03em; margin: 18px 0 8px 4px;
-  }
-  .status { font-size: 10px; padding: 3px 8px; border-radius: 20px; background: #F0E6D8; color: #8A7160; font-weight: 600; }
-  .status.entregue { background: #E4EEDF; color: #567048; }
-  .status.pago { background: #E4EEDF; color: #567048; }
-  .status.naopago { background: #F6E4DE; color: #A0472B; }
-  .status.rascunho { background: #F0E6D8; color: #8A7160; }
-  .status.publicada { background: #E4EEDF; color: #567048; }
-  #loading { text-align: center; padding: 30px; color: #A0917F; }
+  /* ---- Cor da marca (substitui o azul do iOS, como o guia manda) ----
+     --brand  : o caramelo original do Copo de Cookie (só para logo/decoração)
+     --accent : versão um pouco mais escura, que passa no teste de contraste
+                para texto e ícones sobre fundo claro (mín. 4,5:1) */
+  --brand:        #B5651D;
+  --accent:       #9E5A16;
+  --accent-fill:  #9E5A16;
+  --on-accent:    #FFFFFF;
+  --accent-tint:  rgba(158, 90, 22, 0.12);
 
-  /* Calendar */
-  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .cal-header button {
-    border: none; background: #F0E6D8; color: #B5651D; width: 32px; height: 32px;
-    border-radius: 50%; font-size: 16px; font-weight: 700; cursor: pointer;
-  }
-  .cal-title { font-size: 15px; font-weight: 700; color: #5C3A21; text-transform: capitalize; }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .cal-dow { font-size: 10px; font-weight: 700; color: #A0917F; text-align: center; padding-bottom: 4px; }
-  .cal-day {
-    aspect-ratio: 1; border-radius: 8px; background: #FAF7F2; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; font-size: 12px; position: relative; cursor: default; color: #C4B7A6;
-  }
-  .cal-day.in-month { color: #5C3A21; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-  .cal-day.has-orders { cursor: pointer; background: #FCEEDD; border: 1.5px solid #E8B87A; }
-  .cal-day.has-orders:active { background: #F5DDBB; }
-  .cal-day.today { box-shadow: 0 0 0 2px #B5651D inset; }
-  .cal-badge {
-    position: absolute; top: 2px; right: 4px; background: #B5651D; color: white; font-size: 9px;
-    font-weight: 700; border-radius: 20px; min-width: 14px; height: 14px; display: flex;
-    align-items: center; justify-content: center; padding: 0 3px;
-  }
+  /* ---- Cores de status legíveis como TEXTO (as de sistema são claras demais) ---- */
+  --green-text:  #1B7A32;
+  --red-text:    #D70015;
+  --orange-text: #A34700;
+  --green-tint:  rgba(52, 199, 89, 0.16);
+  --red-tint:    rgba(255, 59, 48, 0.13);
+  --orange-tint: rgba(255, 149, 0, 0.16);
+  --yellow-tint: rgba(255, 204, 0, 0.24);
 
-  .modal-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(61,43,31,0.4); z-index: 20;
-    align-items: flex-end; justify-content: center;
-  }
-  .modal-overlay.open { display: flex; }
-  .modal-sheet {
-    background: #FAF7F2; width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto;
-    border-radius: 18px 18px 0 0; padding: 18px 16px 24px;
-  }
-  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .modal-title { font-size: 15px; font-weight: 700; color: #5C3A21; text-transform: capitalize; }
-  .modal-close { border: none; background: #F0E6D8; color: #8A7160; width: 28px; height: 28px; border-radius: 50%; font-size: 14px; cursor: pointer; }
+  /* ---- Cores dos gráficos ---- */
+  --chart-1: #B5651D;
+  --chart-2: #6B4A2B;
+  --chart-3: #E0A030;
+  --chart-grid: rgba(60, 60, 67, 0.12);
 
-  /* Vendas */
-  .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-  .kpi { background: white; border-radius: 12px; padding: 12px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-  .kpi-value { font-size: 18px; font-weight: 800; color: #B5651D; }
-  .kpi-label { font-size: 11px; color: #8A7160; margin-top: 2px; }
-  .chart-wrap { position: relative; height: 220px; }
+  /* ---- Vidro (Liquid Glass) ---- */
+  --glass-bg:     rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.40);
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --backdrop:     rgba(0, 0, 0, 0.40);
+  --seg-thumb:    #FFFFFF;
 
-  /* Sidebar drawer */
-  .drawer-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(61,43,31,0.4); z-index: 30;
-  }
-  .drawer-overlay.open { display: block; }
-  .drawer {
-    position: fixed; top: 0; right: 0; height: 100%; width: 78%; max-width: 300px;
-    background: #FFFDFB; box-shadow: -2px 0 10px rgba(0,0,0,0.15);
-    transform: translateX(100%); transition: transform 0.25s ease;
-    padding: 20px 16px; overflow-y: auto;
-  }
-  .drawer-overlay.open .drawer { transform: translateX(0); }
-  .drawer-title { font-size: 13px; font-weight: 700; color: #8A7160; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 14px; }
-  .drawer-item {
-    display: flex; align-items: center; gap: 10px; padding: 12px 10px; border-radius: 10px;
-    font-size: 14.5px; font-weight: 600; color: #5C3A21; cursor: pointer; margin-bottom: 4px;
-  }
-  .drawer-item.active { background: #FCEEDD; color: #B5651D; }
-  .drawer-item .emoji { font-size: 17px; }
+  /* ---- Tipografia ---- */
+  --font: -apple-system, BlinkMacSystemFont, system-ui, "Inter",
+          "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  /* Recipes */
-  .dynamic-list-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
-  .dynamic-list-row input { flex: 1; }
-  .ingredient-row { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; }
-  .ingredient-row input.ing-nome { flex: 2; }
-  .ingredient-row input.ing-qtd { flex: 1; min-width: 0; }
-  .ingredient-row select.ing-un { flex: 1; min-width: 0; }
-  .row-remove {
-    width: 32px; height: 32px; border-radius: 8px; border: 1px solid #E4D9CC;
-    background: #FAF7F2; color: #B33A3A; font-size: 14px; cursor: pointer; flex-shrink: 0;
-  }
-  .add-row-btn {
-    background: #F0E6D8; color: #B5651D; border: none; padding: 8px 12px; border-radius: 8px;
-    font-size: 12.5px; font-weight: 600; cursor: pointer; margin-top: 2px;
-  }
-  .checkbox-row { display: flex; align-items: center; gap: 8px; }
-  .checkbox-row input { width: auto; }
-  .checkbox-row label { margin-bottom: 0; }
+  /* ---- Espaçamento (múltiplos de 4 e 8) ---- */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px;
+  --page-x: 16px;
+  --page-max: 100%;
 
-  .recipe-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-  .recipe-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  .recipe-name { font-weight: 700; font-size: 15px; color: #5C3A21; }
-  .recipe-desc { font-size: 13px; color: #8A7160; margin-top: 4px; }
-  .recipe-sub { font-size: 12px; font-weight: 700; color: #B5651D; margin-top: 10px; margin-bottom: 4px; }
-  .recipe-list { font-size: 13px; color: #3D2B1F; padding-left: 18px; margin: 0; }
-  .recipe-list li { margin-bottom: 3px; }
-  .recipe-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .recipe-actions button {
-    flex: 1; min-width: 90px; padding: 8px; border-radius: 6px;
-    border: 1px solid #E4D9CC; background: #FAF7F2; font-size: 12px; cursor: pointer;
-  }
+  /* ---- Cantos ---- */
+  --r-field: 12px;   /* campos de texto e busca */
+  --r-group: 16px;   /* grupos de lista e cartões */
+  --r-sheet: 26px;   /* painéis que sobem de baixo */
+  --r-pill:  999px;  /* botões principais */
 
-  /* Estoque */
-  .stock-item {
-    display: flex; justify-content: space-between; align-items: center;
-    background: white; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  }
-  .stock-item-name { font-weight: 600; font-size: 14px; }
-  .stock-item-qty { font-weight: 800; font-size: 15px; color: #B5651D; }
-  .stock-item-qty.low { color: #B33A3A; }
+  /* ---- Movimento: curva de "mola" do iOS ---- */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur: 0.4s;
+}
 
-  /* Níveis de alerta de estoque */
-  .nivel-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; flex-shrink:0; }
-  .nivel-dot.verde { background:#567048; }
-  .nivel-dot.amarelo { background:#D9A441; }
-  .nivel-dot.vermelho { background:#B33A3A; }
-  .stock-item.nivel-amarelo { background:#FFFBEF; border:1px solid #F0DDA8; }
-  .stock-item.nivel-vermelho { background:#FDECEA; border:1px solid #F0B8B0; }
-  .threshold-row {
-    display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #F0E6D8;
-  }
-  .threshold-row:last-child { border-bottom:none; }
-  .threshold-row-name { flex:2; font-size:13.5px; font-weight:600; }
-  .threshold-row input { flex:1; min-width:0; }
-  .threshold-row label { font-size:10.5px; color:#A0917F; display:block; margin-bottom:2px; }
+@media (min-width: 700px) {
+  :root { --page-x: 20px; --page-max: 720px; }
+}
 
-  /* Sininho de notificações */
-  .topbar-actions { display:flex; align-items:center; gap:8px; }
-  .bell-btn { position: relative; }
-  .bell-badge {
-    position:absolute; top:-4px; right:-4px; background:#B33A3A; color:white;
-    font-size:10px; font-weight:800; border-radius:20px; min-width:16px; height:16px;
-    display:flex; align-items:center; justify-content:center; padding:0 4px;
-  }
-  .alert-live-item {
-    display:flex; align-items:center; justify-content:space-between; padding:10px 12px;
-    border-radius:10px; margin-bottom:8px;
-  }
-  .alert-history-row {
-    display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #F0E6D8; font-size:12.5px;
-  }
-  .alert-history-row:last-child { border-bottom:none; }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --blue: #0A84FF;   --green: #30D158;  --red: #FF453A;    --orange: #FF9F0A;
+    --yellow: #FFD60A; --pink: #FF375F;   --purple: #BF5AF2; --indigo: #5E5CE6;
+    --teal: #40CBE0;   --mint: #63E6E2;   --cyan: #64D2FF;   --brown: #AC8E68;
 
-  .outcome-btn-row { display:flex; gap:10px; margin-bottom:12px; }
-  .outcome-btn {
-    flex:1; padding:14px; border-radius:10px; border:2px solid #E4D9CC; background:white;
-    font-size:14px; font-weight:700; cursor:pointer; color:#8A7160;
-  }
-  .outcome-btn.selected.sim { border-color:#567048; background:#E4EEDF; color:#567048; }
-  .outcome-btn.selected.nao { border-color:#B33A3A; background:#FDECEA; color:#B33A3A; }
+    --bg:                #000000;
+    --bg-secondary:      #1C1C1E;
+    --bg-tertiary:       #2C2C2E;
+    --bg-grouped:           #000000;
+    --bg-grouped-secondary: #1C1C1E;
+    --bg-grouped-tertiary:  #2C2C2E;
 
-  .prod-summary-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 0; border-bottom: 1px solid #F0E6D8; font-size: 14px;
-  }
-  .prod-summary-item:last-child { border-bottom: none; }
-  .prod-summary-item.total { font-weight: 800; color: #B5651D; border-top: 2px solid #F0E6D8; padding-top: 12px; margin-top: 4px; border-bottom: none; }
-  .prod-summary-qty { font-weight: 700; }
-  .move-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 8px 0; border-bottom: 1px solid #F0E6D8; font-size: 12.5px;
-  }
-  .move-row:last-child { border-bottom: none; }
-  .move-tag {
-    font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px;
-  }
-  .move-tag.entrada { background: #E4EEDF; color: #567048; }
-  .move-tag.saida { background: #F6E4DE; color: #A0472B; }
+    --label:            #FFFFFF;
+    --label-secondary:  rgba(235, 235, 245, 0.60);
+    --label-tertiary:   rgba(235, 235, 245, 0.30);
+    --label-quaternary: rgba(235, 235, 245, 0.16);
 
-  /* Busca de cliente */
-  .client-search-wrap { position: relative; }
-  .client-dropdown {
-    position: absolute; top: 100%; left: 0; right: 0; background: white;
-    border: 1px solid #E4D9CC; border-radius: 8px; margin-top: 4px; max-height: 180px;
-    overflow-y: auto; z-index: 5; box-shadow: 0 3px 10px rgba(0,0,0,0.1); display: none;
-  }
-  .client-dropdown.open { display: block; }
-  .client-dropdown-item { padding: 10px 12px; font-size: 13.5px; cursor: pointer; border-bottom: 1px solid #F0E6D8; }
-  .client-dropdown-item:last-child { border-bottom: none; }
-  .client-dropdown-item:active { background: #FCEEDD; }
-  .client-dropdown-empty { padding: 10px 12px; font-size: 12.5px; color: #A0917F; }
-  .client-selected-tag {
-    display: inline-flex; align-items: center; gap: 6px; background: #FCEEDD; color: #B5651D;
-    font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 20px; margin-top: 6px;
-  }
-  .client-selected-tag button { border: none; background: none; color: #B5651D; font-weight: 800; cursor: pointer; padding: 0; }
+    --separator:        rgba(84, 84, 88, 0.60);
+    --separator-opaque: #38383A;
 
-  /* Clientes */
-  .client-card {
-    background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06); cursor: pointer;
-  }
-  .client-card-top { display: flex; justify-content: space-between; align-items: center; }
-  .client-name { font-weight: 700; font-size: 15px; color: #5C3A21; }
-  .client-ref { font-size: 12px; color: #8A7160; margin-top: 2px; }
-  .client-badge {
-    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
-    background: #F0E6D8; color: #8A7160; white-space: nowrap;
-  }
-  .client-badge.recorrente { background: #E4EEDF; color: #567048; }
-  .client-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 16px; }
-  .client-detail-title { font-size: 17px; font-weight: 700; color: #5C3A21; margin-bottom: 2px; }
-  .client-detail-ref { font-size: 12.5px; color: #8A7160; margin-bottom: 10px; }
-  .client-detail-obs { font-size: 12.5px; color: #8A7160; background: #FAF7F2; border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
+    --fill:            rgba(120, 120, 128, 0.36);
+    --fill-secondary:  rgba(120, 120, 128, 0.32);
+    --fill-tertiary:   rgba(118, 118, 128, 0.24);
+    --fill-quaternary: rgba(116, 116, 128, 0.18);
 
-  /* Login */
-  #login-screen {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    padding: 20px;
-  }
-  .login-card {
-    background: white; border-radius: 18px; padding: 28px 24px; width: 100%; max-width: 340px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.1); text-align: center;
-  }
-  .login-card h1 { margin-bottom: 4px; }
-  .login-card .subtitle { margin-bottom: 22px; }
-  .login-card .form-grid { text-align: left; margin-bottom: 6px; }
-  .login-error { color: #B33A3A; font-size: 12.5px; margin: 8px 0 0; min-height: 16px; }
+    --gray:  #8E8E93;
+    --gray2: #636366;
+    --gray3: #48484A;
+    --gray4: #3A3A3C;
+    --gray5: #2C2C2E;
+    --gray6: #1C1C1E;
 
-  /* Contas */
-  .account-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-  .account-card-top { display: flex; justify-content: space-between; align-items: center; }
-  .account-user { font-weight: 700; font-size: 15px; color: #5C3A21; }
-  .tab-checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
-  .tab-checklist label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: #5C3A21; margin-bottom: 0; }
-  .tab-checklist input { width: auto; }
-  .tab-checklist.disabled { opacity: 0.4; pointer-events: none; }
-  .logout-item { color: #B33A3A !important; }
+    --accent:      #F0A75E;
+    --accent-fill: #A9601A;
+    --on-accent:   #FFFFFF;
+    --accent-tint: rgba(240, 167, 94, 0.16);
 
-  /* Precificação */
-  .pricing-result-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 8px 0; border-bottom: 1px solid rgba(181,101,29,0.15); font-size: 13.5px;
-  }
-  .pricing-result-row:last-child { border-bottom: none; }
-  .pricing-result-row.highlight { font-weight: 800; font-size: 16px; color: #B5651D; }
-  .pricing-item-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
-  .pricing-item-row input.pi-nome { flex: 2; }
-  .pricing-item-row input.pi-valor { flex: 1; }
-  .pricing-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    --green-text:  #30D158;
+    --red-text:    #FF453A;
+    --orange-text: #FF9F0A;
+    --green-tint:  rgba(48, 209, 88, 0.18);
+    --red-tint:    rgba(255, 69, 58, 0.18);
+    --orange-tint: rgba(255, 159, 10, 0.18);
+    --yellow-tint: rgba(255, 214, 10, 0.20);
 
-  /* Desktop / telas maiores */
-  @media (min-width: 700px) {
-    body { max-width: 760px; margin: 0 auto; padding: 32px 40px 60px; font-size: 16px; }
-    h1 { font-size: 26px; }
-    .subtitle { font-size: 14.5px; margin-bottom: 20px; }
-    .current-tab { font-size: 14px; padding: 8px 16px; }
-    .kebab-btn { width: 44px; height: 44px; font-size: 22px; }
-    .card { padding: 22px 24px; margin-bottom: 18px; border-radius: 16px; }
-    label { font-size: 13.5px; }
-    input, select, textarea { font-size: 15px; padding: 12px 14px; }
-    button.primary { font-size: 16px; padding: 14px; }
-    button.secondary { font-size: 15px; padding: 13px; }
-    .section-title { font-size: 14px; }
-    .order, .recipe-card, .client-card, .stock-item { padding: 16px 18px; }
-    .order-client, .recipe-name, .client-name { font-size: 16.5px; }
-    .order-products, .recipe-desc, .client-ref { font-size: 14px; }
-    .order-actions button, .recipe-actions button { font-size: 13px; padding: 10px; }
-    .kpi-value { font-size: 22px; }
-    .kpi-label { font-size: 12px; }
-    .chart-wrap { height: 280px; }
-    .cal-day { font-size: 14px; }
-    .cal-title { font-size: 17px; }
-    .modal-sheet { max-width: 560px; padding: 26px 28px 30px; }
-    .drawer { max-width: 320px; padding: 26px 20px; }
-    .drawer-item { font-size: 15.5px; padding: 13px 12px; }
-    .product-row, .move-row { font-size: 14.5px; }
-    .tab-btn { font-size: 13.5px; }
+    --chart-1: #E0913F;
+    --chart-2: #C9A27A;
+    --chart-3: #FFD60A;
+    --chart-grid: rgba(235, 235, 245, 0.14);
+
+    --glass-bg:     rgba(30, 30, 30, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    --backdrop:     rgba(0, 0, 0, 0.60);
+    --seg-thumb:    #636366;
   }
+}
+
+/* =====================================================================
+   COMPONENTES iOS — genéricos (usados no app e no /styleguide)
+   ===================================================================== */
+
+/* ---------- Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg-grouped);
+  color: var(--label);
+  font-family: var(--font);
+  font-size: 17px; line-height: 22px; letter-spacing: -0.4px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 100vh; min-height: 100dvh;
+}
+button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+svg.lucide { width: 20px; height: 20px; stroke-width: 2; flex-shrink: 0; }
+i[data-lucide] { display: inline-block; width: 20px; height: 20px; flex-shrink: 0; vertical-align: -4px; }
+.btn i[data-lucide], .btn svg.lucide, button i[data-lucide], button svg.lucide { vertical-align: middle; }
+
+/* ---------- Tipografia (escala oficial do iOS) ---------- */
+.t-large-title { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.4px; }
+.t-title1   { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: 0.36px; }
+.t-title2   { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: 0.35px; }
+.t-title3   { font-size: 20px; line-height: 25px; font-weight: 600; letter-spacing: 0.38px; }
+.t-headline { font-size: 17px; line-height: 22px; font-weight: 600; }
+.t-body     { font-size: 17px; line-height: 22px; font-weight: 400; }
+.t-callout  { font-size: 16px; line-height: 21px; font-weight: 400; letter-spacing: -0.32px; }
+.t-subhead  { font-size: 15px; line-height: 20px; font-weight: 400; letter-spacing: -0.24px; }
+.t-footnote { font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: -0.08px; }
+.t-caption1 { font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: 0; }
+.t-caption2 { font-size: 11px; line-height: 13px; font-weight: 400; letter-spacing: 0.06px; }
+
+/* ---------- Vidro (Liquid Glass) ---------- */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid var(--glass-border);
+}
+
+/* ---------- Efeito de toque (nunca o azul do navegador) ---------- */
+.pressable, button, .list-row { transition: transform var(--dur) var(--ease), opacity 0.2s var(--ease), background-color 0.2s var(--ease); }
+.pressable:active, button:active { transform: scale(0.97); opacity: 0.7; }
+button:disabled { opacity: 0.4; pointer-events: none; }
+
+/* ---------- Barra de navegação (título grande que encolhe) ---------- */
+.navbar { position: sticky; top: 0; z-index: 40; padding-top: env(safe-area-inset-top); }
+.navbar::before {
+  content: ""; position: absolute; inset: 0;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 0.5px solid var(--separator);
+  opacity: 0; transition: opacity 0.25s var(--ease);
+}
+.navbar.collapsed::before { opacity: 1; }
+.navbar-row {
+  position: relative; height: 52px;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 var(--page-x);
+  max-width: var(--page-max); margin: 0 auto;
+}
+.nav-title {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 50%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 17px; line-height: 22px; font-weight: 600;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s var(--ease);
+}
+.navbar.collapsed .nav-title { opacity: 1; }
+.nav-actions { display: flex; gap: 10px; }
+.nav-btn {
+  position: relative; width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center; padding: 0;
+  color: var(--accent); cursor: pointer;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+.nav-btn svg.lucide, .nav-btn i[data-lucide] { width: 22px; height: 22px; }
+.nav-badge {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--red); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px;
+  display: flex; align-items: center; justify-content: center; letter-spacing: 0;
+}
+.large-title { margin: 0; padding: 2px 0 14px; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.4px; }
+
+/* ---------- Tab bar flutuante (cápsula de vidro, iOS 26) ---------- */
+.tabbar {
+  position: fixed; z-index: 45;
+  left: 50%; transform: translateX(-50%);
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  width: min(calc(100% - 32px), 460px);
+  display: flex; gap: 2px; padding: 6px;
+  border-radius: var(--r-pill);
+  box-shadow: var(--glass-shadow);
+}
+.tab-item {
+  flex: 1; min-width: 0; height: 52px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 0; border-radius: var(--r-pill); background: transparent;
+  color: var(--label-secondary);
+  font-size: 11px; line-height: 13px; font-weight: 500; letter-spacing: 0.06px;
+  cursor: pointer;
+}
+.tab-item svg.lucide, .tab-item i[data-lucide] { width: 24px; height: 24px; }
+.tab-item.active { color: var(--accent); background: var(--fill-tertiary); }
+.tab-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Lista agrupada (estilo Ajustes) ---------- */
+.list-header { padding: 0 16px 6px; font-size: 13px; line-height: 18px; letter-spacing: -0.08px; color: var(--label-secondary); }
+.list-footer { padding: 6px 16px 0; font-size: 13px; line-height: 18px; letter-spacing: -0.08px; color: var(--label-secondary); }
+.list-section { margin-bottom: 24px; }
+.list-group { background: var(--bg-grouped-secondary); border-radius: var(--r-group); overflow: hidden; }
+.list-row {
+  position: relative; display: flex; align-items: center; gap: 12px;
+  min-height: 44px; padding: 0 16px; cursor: pointer;
+}
+.list-row.has-icon { --sep-inset: 57px; }
+.list-row + .list-row::before {
+  content: ""; position: absolute; top: 0; right: 0; left: var(--sep-inset, 16px);
+  height: 0.5px; background: var(--separator);
+}
+.list-row:active { background: var(--fill-quaternary); transform: none; opacity: 1; }
+.row-icon {
+  width: 29px; height: 29px; border-radius: 7px; flex-shrink: 0;
+  display: grid; place-items: center; color: #fff; background: var(--tint, var(--gray));
+}
+.row-icon svg.lucide, .row-icon i[data-lucide] { width: 18px; height: 18px; }
+.row-label { flex: 1; min-width: 0; padding: 11px 0; }
+.row-detail { color: var(--label-secondary); }
+.row-chevron { color: var(--gray3); width: 16px !important; height: 16px !important; stroke-width: 2.6 !important; margin-right: -4px; }
+.list-row.destructive .row-label { color: var(--red-text); }
+
+/* ---------- Botões ---------- */
+.btn, button.primary, button.secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 20px; border: 0; border-radius: var(--r-pill);
+  font: 600 17px/22px var(--font); letter-spacing: -0.4px; cursor: pointer;
+}
+.btn-filled, button.primary { background: var(--accent-fill); color: var(--on-accent); }
+.btn-gray, button.secondary { background: var(--fill-tertiary); color: var(--accent); }
+.btn-plain { background: transparent; color: var(--accent); }
+.btn-destructive { background: transparent; color: var(--red-text); }
+.btn-destructive-filled { background: var(--red); color: #fff; }
+button.primary, button.secondary { width: 100%; min-height: 50px; margin-top: 8px; }
+.btn-sm { min-height: 36px; padding: 0 14px; font-size: 15px; }
+
+/* ---------- Toggle (interruptor) 51×31 ---------- */
+input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none;
+  position: relative; flex-shrink: 0; margin: 0;
+  width: 51px !important; height: 31px; padding: 0;
+  border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--fill-secondary);
+  transition: background-color 0.3s var(--ease);
+}
+input[type="checkbox"]::before {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 27px; height: 27px; border-radius: 50%; background: #fff;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15), 0 1px 1px rgba(0,0,0,0.16), 0 3px 1px rgba(0,0,0,0.10);
+  transition: transform 0.3s var(--ease);
+}
+input[type="checkbox"]:checked { background: var(--green); }
+input[type="checkbox"]:checked::before { transform: translateX(20px); }
+
+/* ---------- Segmented control (cápsula cinza com fundo deslizante) ---------- */
+.segmented {
+  --n: 2; --i: 0; --seg-on: 1;
+  position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  padding: 2px; border-radius: 10px; background: var(--fill-tertiary);
+}
+.segmented::before {
+  content: ""; position: absolute; top: 2px; bottom: 2px; left: 2px;
+  width: calc((100% - 4px) / var(--n)); border-radius: 8px;
+  background: var(--seg-thumb);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12), 0 3px 1px rgba(0,0,0,0.04);
+  transform: translateX(calc(var(--i) * 100%));
+  opacity: var(--seg-on);
+  transition: transform 0.35s var(--ease), opacity 0.2s var(--ease);
+}
+.segmented > button {
+  position: relative; z-index: 1; min-height: 32px; padding: 0 8px;
+  border: 0; background: transparent; border-radius: 8px;
+  font: 500 13px/18px var(--font); letter-spacing: -0.08px; color: var(--label);
+  cursor: pointer;
+}
+.segmented > button.selected { font-weight: 600; }
+.segmented > button:active { transform: none; opacity: 0.6; }
+
+/* ---------- Campo de busca ---------- */
+.search-field, .client-search-wrap > input:not([type="checkbox"]) {
+  width: 100%; min-height: 36px; border: 0; border-radius: 10px;
+  padding: 7px 12px 7px 34px;
+  font: 400 17px/22px var(--font); letter-spacing: -0.4px; color: var(--label);
+  background-color: var(--fill-tertiary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 10px center; background-size: 17px;
+}
+
+/* ---------- Campos de formulário (lista agrupada) ---------- */
+.field-group { background: var(--bg-grouped-secondary); border-radius: var(--r-group); overflow: hidden; }
+.field-group > div { position: relative; padding: 10px 16px; }
+.field-group > div + div::before {
+  content: ""; position: absolute; top: 0; right: 0; left: 16px; height: 0.5px; background: var(--separator);
+}
+label { display: block; margin: 0 0 2px; font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: -0.08px; color: var(--label-secondary); }
+input:not([type="checkbox"]), select, textarea {
+  width: 100%; margin: 0; padding: 2px 0; border: 0; border-radius: 0; outline: none;
+  background: transparent; color: var(--label);
+  font: 400 17px/22px var(--font); letter-spacing: -0.4px;
+}
+textarea { resize: vertical; min-height: 44px; }
+input::placeholder, textarea::placeholder { color: var(--label-tertiary); }
+input[type="date"] { min-height: 26px; }
+select {
+  -webkit-appearance: none; appearance: none; padding-right: 26px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0 center; background-size: 18px;
+}
+
+/* ---------- Sheet (painel que sobe de baixo) ---------- */
+.sheet-overlay, .modal-overlay {
+  position: fixed; inset: 0; z-index: 60; display: none;
+  align-items: flex-end; justify-content: center;
+  background: var(--backdrop);
+}
+.sheet-overlay.open, .modal-overlay.open { display: flex; animation: fadeIn 0.3s var(--ease); }
+.sheet, .modal-sheet {
+  position: relative; width: 100%; max-width: 560px; max-height: 92vh; max-height: 92dvh;
+  overflow-y: auto; overscroll-behavior: contain;
+  background: var(--bg-grouped);
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+  animation: sheetUp 0.45s var(--ease);
+  touch-action: pan-y;
+}
+.sheet::before, .modal-sheet::before {
+  content: ""; position: absolute; top: 8px; left: 50%; width: 36px; height: 5px;
+  margin-left: -18px; border-radius: 3px; background: var(--gray3);
+}
+.sheet-header, .modal-header {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  min-height: 44px; margin-bottom: 8px;
+}
+.sheet-title, .modal-title { font-size: 17px; line-height: 22px; font-weight: 600; text-align: center; padding: 0 44px; }
+.sheet-close, .modal-close {
+  position: absolute; right: 0; top: 4px; width: 36px; height: 36px; padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: 50%; cursor: pointer;
+  background: var(--fill-tertiary); color: var(--label-secondary);
+}
+.sheet-close svg.lucide, .modal-close svg.lucide, .modal-close i[data-lucide] { width: 18px; height: 18px; }
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- Alerta (estilo dos avisos do iPhone) ---------- */
+.ios-alert-overlay { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: var(--backdrop); padding: 24px; }
+.ios-alert {
+  width: 270px; border-radius: 14px; overflow: hidden; text-align: center;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%);
+  animation: alertIn 0.35s var(--ease);
+}
+.ios-alert-body { padding: 20px 16px 16px; }
+.ios-alert-title { font-size: 17px; line-height: 22px; font-weight: 600; }
+.ios-alert-msg { margin-top: 2px; font-size: 13px; line-height: 18px; letter-spacing: -0.08px; }
+.ios-alert-actions { display: flex; border-top: 0.5px solid var(--separator); }
+.ios-alert-actions button {
+  flex: 1; min-height: 44px; border: 0; background: transparent; color: var(--accent);
+  font: 400 17px/22px var(--font); letter-spacing: -0.4px; cursor: pointer;
+}
+.ios-alert-actions button + button { border-left: 0.5px solid var(--separator); }
+.ios-alert-actions button.strong { font-weight: 600; }
+.ios-alert-actions button.danger { color: var(--red-text); }
+.ios-alert-actions button:active { transform: none; background: var(--fill-tertiary); opacity: 1; }
+@keyframes alertIn { from { transform: scale(1.12); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ---------- Action sheet ---------- */
+.action-sheet { width: min(100% - 16px, 420px); display: flex; flex-direction: column; gap: 8px; margin-bottom: calc(8px + env(safe-area-inset-bottom)); animation: sheetUp 0.45s var(--ease); }
+.action-sheet-group { border-radius: 14px; overflow: hidden; background: var(--glass-bg); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%); }
+.action-sheet-title { padding: 14px 16px; text-align: center; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--label-secondary); border-bottom: 0.5px solid var(--separator); }
+.action-sheet button { width: 100%; min-height: 57px; border: 0; background: transparent; color: var(--accent); font: 400 20px/25px var(--font); letter-spacing: 0.38px; cursor: pointer; }
+.action-sheet .action-sheet-group button + button { border-top: 0.5px solid var(--separator); }
+.action-sheet button.danger { color: var(--red-text); }
+.action-sheet button.cancel { font-weight: 600; }
+.action-sheet button:active { transform: none; opacity: 1; background: var(--fill-tertiary); }
+
+/* ---------- Respeitar quem desligou as animações ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* =====================================================================
+   ESTILOS DO APP — mantêm os mesmos nomes de classe do site anterior,
+   mas agora só usam os tokens (variáveis) do guia iOS.
+   ===================================================================== */
+
+/* ---------- Estrutura da página ---------- */
+.page { max-width: var(--page-max); margin: 0 auto; padding: 0 var(--page-x) calc(104px + env(safe-area-inset-bottom)); }
+.view { display: none; }
+.view.active { display: block; }
+#loading { text-align: center; padding: 24px; color: var(--label-secondary); font-size: 15px; }
+.empty { text-align: center; color: var(--label-secondary); font-size: 15px; line-height: 20px; padding: 24px 16px; }
+
+/* ---------- Cartões e títulos de seção ---------- */
+.card { background: var(--bg-grouped-secondary); border-radius: var(--r-group); padding: 16px; margin-bottom: 16px; }
+.section-title { margin: 22px 16px 6px; font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: -0.08px; color: var(--label-secondary); }
+.card .section-title { margin: 0 0 12px; font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.4px; color: var(--label); }
+.modal-sheet .card .section-title:first-child { margin-top: 0; }
+
+/* ---------- Formulários (lista agrupada) ---------- */
+.form-grid { display: flex; flex-direction: column; }
+.form-grid > div { position: relative; padding: 10px 16px; }
+.form-grid > div + div::before { content: ""; position: absolute; top: 0; right: 0; left: 16px; height: 0.5px; background: var(--separator); }
+.card > .form-grid { margin: 0 -16px 12px; }
+.modal-sheet > .form-grid, .login-card .form-grid { background: var(--bg-grouped-secondary); border-radius: var(--r-group); overflow: hidden; margin-bottom: 12px; }
+.price-wrap { display: flex; align-items: center; gap: 6px; }
+.price-prefix { font-size: 17px; font-weight: 600; color: var(--label-secondary); }
+.price-wrap input { flex: 1; }
+.checkbox-row { display: flex; flex-direction: row-reverse; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.checkbox-row label { margin: 0; font-size: 17px; line-height: 22px; color: var(--label); letter-spacing: -0.4px; }
+.filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.filter-row > div { padding: 8px 12px; border-radius: 12px; background: var(--fill-quaternary); }
+
+/* ---------- Botões pequenos ---------- */
+.add-row-btn { min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--accent); font: 600 15px/20px var(--font); letter-spacing: -0.24px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.row-remove { width: 36px; height: 36px; flex-shrink: 0; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--red-tint); color: var(--red-text); cursor: pointer; }
+.row-remove svg.lucide, .row-remove i[data-lucide] { width: 16px; height: 16px; }
+/* Ações do cartão: linhas de lista (44px), como no iOS — sem texto quebrando em dois */
+.order-actions, .recipe-actions { display: flex; flex-direction: column; margin: 14px -16px -16px; }
+.order-actions button, .recipe-actions button {
+  display: flex; align-items: center; justify-content: flex-start; gap: 12px;
+  min-height: 44px; padding: 0 16px; border: 0; border-top: 0.5px solid var(--separator); border-radius: 0;
+  background: transparent; color: var(--accent);
+  font: 400 17px/22px var(--font); letter-spacing: -0.4px; text-align: left; cursor: pointer;
+}
+.order-actions button:active, .recipe-actions button:active { transform: none; opacity: 1; background: var(--fill-quaternary); }
+.order-actions button.btn-done { color: var(--green-text); }
+.order-actions button.btn-del, .recipe-actions button.btn-del { color: var(--red-text); }
+
+/* ---------- Status (cápsulas coloridas) ---------- */
+.status { display: inline-flex; align-items: center; padding: 1px 9px; border-radius: 999px; font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: 0; background: var(--fill-tertiary); color: var(--label-secondary); }
+.status.entregue, .status.pago, .status.publicada { background: var(--green-tint); color: var(--green-text); }
+.status.naopago { background: var(--red-tint); color: var(--red-text); }
+.status.rascunho { background: var(--fill-tertiary); color: var(--label-secondary); }
+
+/* ---------- Pedidos ---------- */
+.order { background: var(--bg-grouped-secondary); border-radius: var(--r-group); padding: 16px; margin-bottom: 12px; overflow: hidden; }
+.order-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.order-client { font-size: 17px; line-height: 22px; font-weight: 600; }
+.order-date { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.order-products { margin-top: 4px; font-size: 15px; line-height: 20px; letter-spacing: -0.24px; }
+.order-value { margin-top: 4px; font-size: 15px; line-height: 20px; font-weight: 600; }
+.order-delivery { margin-top: 4px; font-size: 13px; line-height: 18px; color: var(--label-secondary); display: flex; align-items: center; gap: 6px; }
+.order-delivery svg.lucide, .order-delivery i[data-lucide] { width: 16px; height: 16px; }
+.order-meta { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; color: var(--label-secondary); }
+
+/* ---------- Produtos do pedido (stepper) ---------- */
+.product-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-right: -16px; padding-right: 16px; }
+.product-row + .product-row { border-top: 0.5px solid var(--separator); }
+.product-name { flex: 1; font-size: 16px; line-height: 21px; letter-spacing: -0.32px; }
+.qty-control { display: flex; align-items: center; padding: 2px; border-radius: 999px; background: var(--fill-tertiary); }
+.qty-control button { width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--accent); font: 500 22px/1 var(--font); cursor: pointer; }
+.qty-control span { min-width: 30px; text-align: center; font-size: 17px; font-weight: 600; }
+
+/* ---------- Calendário ---------- */
+.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cal-header button { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: var(--fill-tertiary); color: var(--accent); cursor: pointer; display: grid; place-items: center; }
+.cal-header button svg.lucide, .cal-header button i[data-lucide] { width: 22px; height: 22px; }
+.cal-title { font-size: 17px; line-height: 22px; font-weight: 600; }
+.cal-title::first-letter { text-transform: uppercase; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-dow { padding-bottom: 4px; text-align: center; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--label-secondary); }
+.cal-day { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 14px; font-size: 17px; color: var(--label); }
+.cal-day.has-orders { cursor: pointer; background: var(--accent-tint); color: var(--accent); font-weight: 600; }
+.cal-day.has-orders:active { opacity: 0.6; }
+.cal-day.today { background: var(--accent-fill); color: var(--on-accent); font-weight: 700; }
+.cal-badge { position: absolute; top: 3px; right: 3px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--red); color: #fff; font-size: 11px; line-height: 17px; font-weight: 700; text-align: center; letter-spacing: 0; }
+
+/* ---------- Vendas ---------- */
+.kpis, .client-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.kpi { padding: 14px 12px; border-radius: var(--r-group); background: var(--bg-grouped-secondary); text-align: center; }
+.modal-sheet .client-kpis .kpi { background: var(--bg-grouped-secondary); }
+.kpi-value { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: 0.35px; color: var(--accent); }
+.kpi-label { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--label-secondary); letter-spacing: 0; }
+.chart-wrap { position: relative; height: 240px; }
+
+/* ---------- Menu (sheet com lista agrupada) ---------- */
+.drawer-overlay { position: fixed; inset: 0; z-index: 70; display: none; align-items: flex-end; justify-content: center; background: var(--backdrop); }
+.drawer-overlay.open { display: flex; animation: fadeIn 0.3s var(--ease); }
+.drawer {
+  position: relative; width: 100%; max-width: 560px; max-height: 92vh; max-height: 92dvh;
+  overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  background: var(--bg-grouped); border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+  animation: sheetUp 0.45s var(--ease);
+}
+.drawer::before { content: ""; position: absolute; top: 8px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--gray3); }
+.menu-head { display: flex; align-items: center; gap: 12px; padding: 8px 4px 20px; }
+.menu-logo { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; background: var(--brand); color: #fff; }
+.menu-logo svg.lucide, .menu-logo i[data-lucide] { width: 28px; height: 28px; }
+.menu-name { font-size: 20px; line-height: 25px; font-weight: 600; letter-spacing: 0.38px; }
+.menu-user { font-size: 13px; line-height: 18px; color: var(--label-secondary); }
+.drawer-item .row-label { font-size: 17px; }
+.drawer-item.active .row-label { color: var(--accent); font-weight: 600; }
+.drawer-item.active .row-chevron { color: var(--accent); }
+
+/* ---------- Receitas ---------- */
+.dynamic-list-row, .ingredient-row, .pricing-item-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.dynamic-list-row input, .ingredient-row input.ing-qtd, .pricing-item-row input { background-color: var(--fill-tertiary); border-radius: 10px; padding: 8px 10px; min-height: 36px; }
+.dynamic-list-row input { flex: 1; }
+.ingredient-row input.ing-qtd { flex: 1; min-width: 0; max-width: 96px; }
+.pricing-item-row input.pi-nome { flex: 2; }
+.pricing-item-row input.pi-valor { flex: 1; min-width: 0; }
+.recipe-card, .client-card, .account-card, .pricing-card { background: var(--bg-grouped-secondary); border-radius: var(--r-group); padding: 16px; margin-bottom: 12px; overflow: hidden; }
+.recipe-card-top, .client-card-top, .account-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.recipe-name, .client-name, .account-user { font-size: 17px; line-height: 22px; font-weight: 600; }
+.recipe-desc { margin-top: 4px; font-size: 15px; line-height: 20px; color: var(--label-secondary); }
+.recipe-sub { margin: 14px 0 4px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--label-secondary); }
+.recipe-list { margin: 0; padding-left: 20px; font-size: 15px; line-height: 20px; }
+.recipe-list li { margin-bottom: 3px; }
+
+/* ---------- Estoque ---------- */
+#stock-overview-list, #stock-items-list { background: var(--bg-grouped-secondary); border-radius: var(--r-group); overflow: hidden; }
+.stock-item { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 52px; padding: 10px 16px; }
+.stock-item + .stock-item::before { content: ""; position: absolute; top: 0; right: 0; left: 16px; height: 0.5px; background: var(--separator); }
+.stock-item-name { font-size: 17px; line-height: 22px; font-weight: 500; }
+.stock-item-qty { font-size: 17px; font-weight: 600; color: var(--label); white-space: nowrap; }
+.stock-item-qty.low { color: var(--red-text); }
+.nivel-dot { display: inline-block; width: 10px; height: 10px; margin-right: 10px; border-radius: 50%; flex-shrink: 0; vertical-align: middle; }
+.nivel-dot.verde { background: var(--green); }
+.nivel-dot.amarelo { background: var(--yellow); }
+.nivel-dot.vermelho { background: var(--red); }
+.stock-item.nivel-amarelo, .alert-live-item.nivel-amarelo { background: var(--yellow-tint); }
+.stock-item.nivel-vermelho, .alert-live-item.nivel-vermelho { background: var(--red-tint); }
+.move-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; font-size: 15px; line-height: 20px; }
+.move-row + .move-row { border-top: 0.5px solid var(--separator); }
+.move-tag { display: inline-block; margin-right: 6px; padding: 0 8px; border-radius: 999px; font-size: 12px; line-height: 18px; font-weight: 600; }
+.move-tag.entrada { background: var(--green-tint); color: var(--green-text); }
+.move-tag.saida { background: var(--red-tint); color: var(--red-text); }
+.prod-summary-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; font-size: 17px; }
+.prod-summary-item + .prod-summary-item { border-top: 0.5px solid var(--separator); }
+.prod-summary-item.total { font-weight: 700; }
+.prod-summary-qty { font-weight: 600; }
+
+/* ---------- Notificações ---------- */
+.alert-live-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; font-size: 17px; }
+.alert-live-item + .alert-live-item { border-top: 0.5px solid var(--separator); }
+.alert-history-row { display: flex; align-items: center; gap: 10px; padding: 12px 16px; font-size: 15px; line-height: 20px; }
+.alert-history-row + .alert-history-row { border-top: 0.5px solid var(--separator); }
+.alert-history-row .nivel-dot { margin-right: 0; }
+
+/* ---------- Busca de cliente / item ---------- */
+.client-search-wrap { position: relative; }
+.client-dropdown { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30; display: none; max-height: 260px; overflow-y: auto; border-radius: var(--r-field); background: var(--bg-grouped-secondary); border: 0.5px solid var(--separator); box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+.client-dropdown.open { display: block; }
+.client-dropdown-item { min-height: 44px; padding: 11px 14px; font-size: 17px; line-height: 22px; cursor: pointer; }
+.client-dropdown-item + .client-dropdown-item { border-top: 0.5px solid var(--separator); }
+.client-dropdown-item:active { background: var(--fill-tertiary); }
+.client-dropdown-empty { padding: 12px 14px; font-size: 15px; color: var(--label-secondary); }
+.client-selected-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 6px 6px 12px; border-radius: 999px; background: var(--accent-tint); color: var(--accent); font-size: 15px; line-height: 20px; font-weight: 600; }
+.client-selected-tag button { width: 24px; height: 24px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--fill-tertiary); color: var(--accent); cursor: pointer; }
+.client-selected-tag button svg.lucide, .client-selected-tag button i[data-lucide] { width: 14px; height: 14px; }
+
+/* ---------- Clientes ---------- */
+.client-ref { margin-top: 2px; font-size: 13px; line-height: 18px; color: var(--label-secondary); display: flex; align-items: center; gap: 6px; }
+.client-ref svg.lucide, .client-ref i[data-lucide] { width: 14px; height: 14px; }
+.client-badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 9px; border-radius: 999px; background: var(--fill-tertiary); color: var(--label-secondary); font-size: 12px; line-height: 18px; font-weight: 600; white-space: nowrap; }
+.client-badge.recorrente { background: var(--green-tint); color: var(--green-text); }
+.client-badge svg.lucide, .client-badge i[data-lucide] { width: 13px; height: 13px; }
+.client-detail-title { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: 0.35px; }
+.client-detail-ref { margin: 2px 0 8px; font-size: 15px; line-height: 20px; color: var(--label-secondary); display: flex; align-items: center; gap: 6px; }
+.client-detail-obs { margin: 8px 0 12px; padding: 10px 12px; border-radius: var(--r-field); background: var(--bg-grouped-secondary); font-size: 15px; line-height: 20px; color: var(--label-secondary); }
+
+/* ---------- Tentativa de venda (segmented) ---------- */
+.outcome-btn-row { margin-bottom: 12px; }
+.outcome-btn { min-height: 40px !important; font-size: 15px !important; }
+.segmented .outcome-btn.selected.sim { color: var(--green-text); }
+.segmented .outcome-btn.selected.nao { color: var(--red-text); }
+
+/* ---------- Login ---------- */
+#login-screen { min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); }
+.login-card { width: 100%; max-width: 360px; text-align: center; }
+.login-logo { width: 72px; height: 72px; margin: 0 auto 16px; border-radius: 18px; display: grid; place-items: center; background: var(--brand); color: #fff; }
+.login-logo svg.lucide, .login-logo i[data-lucide] { width: 40px; height: 40px; }
+.login-card h1 { margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: 0.36px; }
+.login-sub { margin: 4px 0 24px; font-size: 15px; line-height: 20px; color: var(--label-secondary); }
+.login-card .form-grid { text-align: left; }
+.login-error { min-height: 20px; margin: 4px 0 4px; font-size: 13px; line-height: 18px; color: var(--red-text); }
+
+/* ---------- Contas ---------- */
+.tab-checklist { display: flex; flex-direction: column; margin: 4px 0 0; border-radius: var(--r-field); background: var(--fill-quaternary); }
+.tab-checklist label { position: relative; display: flex; flex-direction: row-reverse; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; margin: 0; padding: 0 14px; font-size: 17px; line-height: 22px; color: var(--label); letter-spacing: -0.4px; }
+.tab-checklist label + label { border-top: 0.5px solid var(--separator); }
+.tab-checklist.disabled { opacity: 0.4; pointer-events: none; }
+
+/* ---------- Precificação ---------- */
+.pricing-result-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; font-size: 15px; line-height: 20px; }
+.pricing-result-row + .pricing-result-row { border-top: 0.5px solid var(--separator); }
+.pricing-result-row.highlight { font-size: 17px; font-weight: 700; color: var(--accent); }
+
+/* ---------- Textos pequenos escritos direto no HTML ganham altura de linha do iOS ---------- */
+[style*="font-size:12px"], [style*="font-size:13px"] { line-height: 18px; }
+#sa-motivo-wrap { padding: 10px 16px; border-radius: var(--r-group); background: var(--bg-grouped-secondary); }
+
+/* ---------- Telas maiores (computador / tablet) ---------- */
+@media (min-width: 700px) {
+  .chart-wrap { height: 300px; }
+  .tabbar { width: 460px; }
+}
+
 </style>
 </head>
 <body>
 
 <div id="login-screen">
   <div class="login-card">
-    <h1>🍪 Copo de Cookie</h1>
-    <div class="subtitle">Acesso restrito</div>
+    <div class="login-logo"><i data-lucide="cookie"></i></div>
+    <h1>Copo de Cookie</h1>
+    <div class="login-sub">Acesso restrito</div>
     <div class="form-grid">
       <div>
         <label>Usuário</label>
@@ -393,17 +728,18 @@
 
 <div id="app-root" style="display:none">
 
-<div class="topbar">
-  <div>
-    <h1>🍪 Copo de Cookie</h1>
+<header class="navbar" id="navbar">
+  <div class="navbar-row">
+    <div class="nav-title" id="nav-title">Pedidos</div>
+    <div class="nav-actions">
+      <button class="nav-btn" onclick="openAlertsPanel()" aria-label="Notificações"><i data-lucide="bell"></i><span id="bell-badge" class="nav-badge" style="display:none">0</span></button>
+      <button class="nav-btn" onclick="openDrawer()" aria-label="Menu"><i data-lucide="more-horizontal"></i></button>
+    </div>
   </div>
-  <div class="topbar-actions">
-    <button class="kebab-btn bell-btn" onclick="openAlertsPanel()">🔔<span id="bell-badge" class="bell-badge" style="display:none">0</span></button>
-    <button class="kebab-btn" onclick="openDrawer()">⋮</button>
-  </div>
-</div>
-<div class="subtitle">Pedidos, entregas, vendas e receitas</div>
-<div class="current-tab" id="current-tab-label">📋 Pedidos</div>
+</header>
+
+<main class="page">
+<h1 class="large-title" id="current-tab-label">Pedidos</h1>
 
 <!-- VIEW: PEDIDOS -->
 <div id="view-pedidos" class="view active">
@@ -464,7 +800,7 @@
 
 <!-- VIEW: HISTORICO -->
 <div id="view-historico" class="view">
-  <div style="font-size:12px;color:#A0917F;margin:0 0 12px 4px;">Pedidos entregues e pagos ficam guardados aqui.</div>
+  <div style="font-size:12px;color:var(--label-secondary);margin:0 0 12px 4px;">Pedidos entregues e pagos ficam guardados aqui.</div>
   <div id="historico-list"></div>
 </div>
 
@@ -472,7 +808,7 @@
 <div id="view-estoque-gestao" class="view">
   <div class="card">
     <div class="section-title" style="margin-top:0" id="si-form-title">Novo item de estoque</div>
-    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Cadastre aqui as matérias-primas antes de lançar entradas/saídas ou vincular em receitas.</div>
+    <div style="font-size:13px;color:var(--label-secondary);margin-bottom:10px;">Cadastre aqui as matérias-primas antes de lançar entradas/saídas ou vincular em receitas.</div>
     <div class="form-grid">
       <div>
         <label>Nome do item</label>
@@ -489,11 +825,11 @@
         </select>
       </div>
       <div>
-        <label>🟡 Aviso amarelo abaixo de (opcional)</label>
+        <label><span class="nivel-dot amarelo" style="margin-right:6px"></span>Aviso amarelo abaixo de (opcional)</label>
         <input id="si-limite-amarelo" type="number" min="0" step="0.01" placeholder="Ex: 500">
       </div>
       <div>
-        <label>🔴 Aviso vermelho abaixo de (opcional)</label>
+        <label><span class="nivel-dot vermelho" style="margin-right:6px"></span>Aviso vermelho abaixo de (opcional)</label>
         <input id="si-limite-vermelho" type="number" min="0" step="0.01" placeholder="Ex: 100">
       </div>
     </div>
@@ -534,7 +870,7 @@
 
   <div class="card">
     <div class="section-title" style="margin-top:0">Registrar saída (ajuste manual)</div>
-    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Use isso só pra ajustes manuais — a saída por produção é lançada automaticamente ao marcar um pedido como produzido.</div>
+    <div style="font-size:13px;color:var(--label-secondary);margin-bottom:10px;">Use isso só pra ajustes manuais — a saída por produção é lançada automaticamente ao marcar um pedido como produzido.</div>
     <div class="form-grid">
       <div>
         <label>Item de estoque</label>
@@ -563,7 +899,7 @@
 
   <div class="card">
     <div class="section-title" style="margin-top:0">Marcar pedidos de um dia como produzidos</div>
-    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Marca todos os pedidos com entrega nessa data como produzidos de uma vez, descontando o estoque conforme as receitas (Cookie + Ganache do sabor).</div>
+    <div style="font-size:13px;color:var(--label-secondary);margin-bottom:10px;">Marca todos os pedidos com entrega nessa data como produzidos de uma vez, descontando o estoque conforme as receitas (Cookie + Ganache do sabor).</div>
     <div class="form-grid">
       <div>
         <label>Data</label>
@@ -575,13 +911,13 @@
 
   <div class="card">
     <div class="section-title" style="margin-top:0">Zerar estoque</div>
-    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Leva o saldo de todas as matérias-primas visíveis pra você a zero (lança um ajuste de entrada/saída pra compensar), sem apagar os itens ou o histórico. Use isso pra recontar o estoque do zero.</div>
+    <div style="font-size:13px;color:var(--label-secondary);margin-bottom:10px;">Leva o saldo de todas as matérias-primas visíveis pra você a zero (lança um ajuste de entrada/saída pra compensar), sem apagar os itens ou o histórico. Use isso pra recontar o estoque do zero.</div>
     <button class="primary" onclick="zerarEstoque()">Zerar saldo de todas as matérias-primas</button>
   </div>
 
   <div class="card">
     <div class="section-title" style="margin-top:0">Mesclar nomes duplicados</div>
-    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Pra corrigir movimentações antigas que usaram nomes diferentes pro mesmo item. Escolha o nome "de" e o nome "para".</div>
+    <div style="font-size:13px;color:var(--label-secondary);margin-bottom:10px;">Pra corrigir movimentações antigas que usaram nomes diferentes pro mesmo item. Escolha o nome "de" e o nome "para".</div>
     <div class="form-grid">
       <div>
         <label>De (nome duplicado)</label>
@@ -600,7 +936,7 @@
 </div>
 
 <div id="view-estoque-visao" class="view">
-  <div style="font-size:12px;color:#A0917F;margin:0 0 12px 4px;">Saldo atual de cada matéria-prima (entradas − saídas). As cores refletem os limites definidos em Gerenciamento de Estoque.</div>
+  <div style="font-size:12px;color:var(--label-secondary);margin:0 0 12px 4px;">Saldo atual de cada matéria-prima (entradas − saídas). As cores refletem os limites definidos em Gerenciamento de Estoque.</div>
   <div id="stock-overview-list"></div>
 </div>
 
@@ -609,9 +945,9 @@
 <div id="view-calendario" class="view">
   <div class="card">
     <div class="cal-header">
-      <button onclick="calShift(-1)">‹</button>
+      <button onclick="calShift(-1)" aria-label="Mês anterior"><i data-lucide="chevron-left"></i></button>
       <div class="cal-title" id="cal-title"></div>
-      <button onclick="calShift(1)">›</button>
+      <button onclick="calShift(1)" aria-label="Próximo mês"><i data-lucide="chevron-right"></i></button>
     </div>
     <div class="cal-grid" id="cal-dow-row"></div>
     <div class="cal-grid" id="cal-grid" style="margin-top:4px"></div>
@@ -619,7 +955,7 @@
 
   <div class="card">
     <div class="section-title" style="margin-top:0">Resumo de produção do mês</div>
-    <div style="font-size:11.5px;color:#A0917F;margin:-6px 0 10px;">Soma de todos os pedidos com entrega neste mês, pagos ou não.</div>
+    <div style="font-size:12px;color:var(--label-secondary);margin:-6px 0 10px;">Soma de todos os pedidos com entrega neste mês, pagos ou não.</div>
     <div id="cal-production-summary"></div>
   </div>
 </div>
@@ -638,7 +974,7 @@
       </div>
     </div>
   </div>
-  <div style="font-size:11px;color:#A0917F;margin:-8px 0 14px 4px;">💰 Os dados abaixo consideram apenas pedidos marcados como <strong>pagos</strong>.</div>
+  <div style="font-size:12px;color:var(--label-secondary);margin:-8px 0 14px 4px;"><i data-lucide="info"></i> Os dados abaixo consideram apenas pedidos marcados como <strong>pagos</strong>.</div>
 
   <div class="kpis">
     <div class="kpi">
@@ -668,7 +1004,7 @@
 
   <div class="card">
     <div class="section-title" style="margin-top:0">Revenda: convertidas vs não convertidas</div>
-    <div style="font-size:11.5px;color:#A0917F;margin:-6px 0 10px;">Baseado nas tentativas de venda registradas na Análise de Clientes.</div>
+    <div style="font-size:12px;color:var(--label-secondary);margin:-6px 0 10px;">Baseado nas tentativas de venda registradas na Análise de Clientes.</div>
     <div class="chart-wrap"><canvas id="chart-revenda"></canvas></div>
   </div>
 </div>
@@ -708,7 +1044,7 @@
 
       <div class="checkbox-row">
         <input id="r-publicar" type="checkbox">
-        <label for="r-publicar" style="font-size:13px">Publicar esta receita agora</label>
+        <label for="r-publicar">Publicar esta receita agora</label>
       </div>
     </div>
     <button class="primary" id="r-submit-btn" onclick="submitRecipe()">Salvar receita</button>
@@ -757,13 +1093,13 @@
 <!-- VIEW: ANALISE DE CLIENTES -->
 <div id="view-analise-clientes" class="view">
   <div class="card">
-    <div class="section-title" style="margin-top:0">🤖 Análise com IA</div>
-    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Pede pra uma IA (Kimi) analisar todos os clientes visíveis nessa conta e sugerir quem priorizar.</div>
+    <div class="section-title" style="margin-top:0"><i data-lucide="sparkles"></i> Análise com IA</div>
+    <div style="font-size:13px;color:var(--label-secondary);margin-bottom:10px;">Pede pra uma IA (Kimi) analisar todos os clientes pagos e sugerir quem priorizar.</div>
     <button class="primary" id="ai-analysis-btn" onclick="analisarClientesComIA()">Analisar clientes com IA</button>
     <div id="ai-analysis-result" style="white-space:pre-wrap;margin-top:14px;font-size:13.5px;line-height:1.55;"></div>
   </div>
 
-  <div style="font-size:12px;color:#A0917F;margin:0 0 12px 4px;">Toque em um cliente pra ver o histórico de compras.</div>
+  <div style="font-size:12px;color:var(--label-secondary);margin:0 0 12px 4px;">Toque em um cliente pra ver o histórico de compras.</div>
   <div id="clients-analysis-list"></div>
 </div>
 
@@ -782,7 +1118,7 @@
       </div>
       <div class="checkbox-row">
         <input id="a-admin" type="checkbox" onchange="toggleAdminChecklist()">
-        <label for="a-admin" style="font-size:13px">Esta conta é administradora (acesso total)</label>
+        <label for="a-admin">Esta conta é administradora (acesso total)</label>
       </div>
       <div>
         <label>Abas liberadas para esse usuário</label>
@@ -795,7 +1131,7 @@
 
   <div class="card">
     <div class="section-title" style="margin-top:0">Atribuir pedidos e clientes antigos</div>
-    <div style="font-size:12.5px;color:#8A7160;margin-bottom:10px;">Pedidos e clientes cadastrados antes da separação por conta não têm dono. Escolha uma conta abaixo pra atribuir todos eles de uma vez.</div>
+    <div style="font-size:13px;color:var(--label-secondary);margin-bottom:10px;">Pedidos e clientes cadastrados antes da separação por conta não têm dono. Escolha uma conta abaixo pra atribuir todos eles de uma vez.</div>
     <div class="form-grid">
       <div>
         <label>Atribuir para</label>
@@ -839,7 +1175,7 @@
       </div>
     </div>
 
-    <div class="card" style="background:#FCEEDD;box-shadow:none;margin-top:16px;">
+    <div class="card" style="background:var(--accent-tint);box-shadow:none;margin-top:16px;">
       <div class="section-title" style="margin-top:0">Resultado</div>
       <div id="pricing-result"></div>
     </div>
@@ -852,23 +1188,61 @@
   <div id="pricing-profiles-list"></div>
 </div>
 
-<!-- DRAWER -->
+</main>
+
+<!-- TAB BAR flutuante (montada pelo JS conforme as permissões) -->
+<nav class="tabbar glass" id="tabbar" aria-label="Abas principais" style="display:none"></nav>
+
+<!-- MENU (sheet com lista agrupada) -->
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawerBg(event)">
-  <div class="drawer">
-    <div class="drawer-title" id="drawer-title">Menu</div>
-    <div class="drawer-item" data-tab="pedidos" onclick="switchTab('pedidos')"><span class="emoji">📋</span> Pedidos</div>
-    <div class="drawer-item" data-tab="historico" onclick="switchTab('historico')"><span class="emoji">🗂️</span> Histórico</div>
-    <div class="drawer-item" data-tab="calendario" onclick="switchTab('calendario')"><span class="emoji">📅</span> Calendário</div>
-    <div class="drawer-item" data-tab="vendas" onclick="switchTab('vendas')"><span class="emoji">📊</span> Vendas</div>
-    <div class="drawer-item" data-tab="estoque-gestao" onclick="switchTab('estoque-gestao')"><span class="emoji">📦</span> Gerenciamento de Estoque</div>
-    <div class="drawer-item" data-tab="estoque-visao" onclick="switchTab('estoque-visao')"><span class="emoji">📊</span> Visão de Estoque</div>
-    <div class="drawer-item" data-tab="gerenciar-receitas" onclick="switchTab('gerenciar-receitas')"><span class="emoji">📝</span> Gerenciar receitas</div>
-    <div class="drawer-item" data-tab="receitas-publicas" onclick="switchTab('receitas-publicas')"><span class="emoji">📖</span> Receitas</div>
-    <div class="drawer-item" data-tab="cadastro-clientes" onclick="switchTab('cadastro-clientes')"><span class="emoji">🧑‍🤝‍🧑</span> Cadastro de clientes</div>
-    <div class="drawer-item" data-tab="analise-clientes" onclick="switchTab('analise-clientes')"><span class="emoji">🔎</span> Análise de clientes</div>
-    <div class="drawer-item" data-tab="contas" id="drawer-item-contas" onclick="switchTab('contas')" style="display:none"><span class="emoji">🔐</span> Contas</div>
-    <div class="drawer-item" data-tab="precificacao" id="drawer-item-precificacao" onclick="switchTab('precificacao')" style="display:none"><span class="emoji">💰</span> Precificação</div>
-    <div class="drawer-item logout-item" onclick="doLogout()" style="margin-top:14px;border-top:1px solid #F0E6D8;padding-top:14px;"><span class="emoji">🚪</span> Sair</div>
+  <div class="drawer" role="dialog" aria-label="Menu">
+    <div class="menu-head">
+      <div class="menu-logo"><i data-lucide="cookie"></i></div>
+      <div>
+        <div class="menu-name">Copo de Cookie</div>
+        <div class="menu-user" id="drawer-title">Menu</div>
+      </div>
+    </div>
+    <div class="list-section" data-group>
+      <div class="list-header">Pedidos e entregas</div>
+      <div class="list-group">
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="pedidos" onclick="switchTab('pedidos')"><span class="row-icon" style="--tint:var(--orange)"><i data-lucide="clipboard-list"></i></span><span class="row-label">Pedidos</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="historico" onclick="switchTab('historico')"><span class="row-icon" style="--tint:var(--gray)"><i data-lucide="history"></i></span><span class="row-label">Histórico</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="calendario" onclick="switchTab('calendario')"><span class="row-icon" style="--tint:var(--red)"><i data-lucide="calendar"></i></span><span class="row-label">Calendário</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+      </div>
+    </div>
+    <div class="list-section" data-group>
+      <div class="list-header">Vendas e clientes</div>
+      <div class="list-group">
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="vendas" onclick="switchTab('vendas')"><span class="row-icon" style="--tint:var(--green)"><i data-lucide="bar-chart-3"></i></span><span class="row-label">Vendas</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="analise-clientes" onclick="switchTab('analise-clientes')"><span class="row-icon" style="--tint:var(--indigo)"><i data-lucide="trending-up"></i></span><span class="row-label">Análise de clientes</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="cadastro-clientes" onclick="switchTab('cadastro-clientes')"><span class="row-icon" style="--tint:var(--blue)"><i data-lucide="user-plus"></i></span><span class="row-label">Cadastro de clientes</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+      </div>
+    </div>
+    <div class="list-section" data-group>
+      <div class="list-header">Produção</div>
+      <div class="list-group">
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="estoque-gestao" onclick="switchTab('estoque-gestao')"><span class="row-icon" style="--tint:var(--brown)"><i data-lucide="package"></i></span><span class="row-label">Gerenciamento de Estoque</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="estoque-visao" onclick="switchTab('estoque-visao')"><span class="row-icon" style="--tint:var(--teal)"><i data-lucide="boxes"></i></span><span class="row-label">Visão de Estoque</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="gerenciar-receitas" onclick="switchTab('gerenciar-receitas')"><span class="row-icon" style="--tint:var(--pink)"><i data-lucide="chef-hat"></i></span><span class="row-label">Gerenciar receitas</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="receitas-publicas" onclick="switchTab('receitas-publicas')"><span class="row-icon" style="--tint:var(--purple)"><i data-lucide="book-open"></i></span><span class="row-label">Receitas</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+      </div>
+    </div>
+    <div class="list-section" data-group>
+      <div class="list-header">Administração</div>
+      <div class="list-group">
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="precificacao" id="drawer-item-precificacao" onclick="switchTab('precificacao')" style="display:none"><span class="row-icon" style="--tint:var(--cyan)"><i data-lucide="calculator"></i></span><span class="row-label">Precificação</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+        <div class="drawer-item list-row has-icon" role="button" tabindex="0" data-tab="contas" id="drawer-item-contas" onclick="switchTab('contas')" style="display:none"><span class="row-icon" style="--tint:var(--gray)"><i data-lucide="lock"></i></span><span class="row-label">Contas</span><i data-lucide="chevron-right" class="row-chevron"></i></div>
+      </div>
+    </div>
+    <div class="list-section">
+      <div class="list-group">
+        <div class="list-row has-icon destructive" role="button" tabindex="0" onclick="doLogout()">
+          <span class="row-icon" style="--tint:var(--red)"><i data-lucide="log-out"></i></span>
+          <span class="row-label">Sair</span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -877,7 +1251,7 @@
   <div class="modal-sheet">
     <div class="modal-header">
       <div class="modal-title" id="modal-title">Dia</div>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+      <button class="modal-close" onclick="closeModal()" aria-label="Fechar"><i data-lucide="x"></i></button>
     </div>
     <div id="modal-body"></div>
   </div>
@@ -888,7 +1262,7 @@
   <div class="modal-sheet">
     <div class="modal-header">
       <div class="modal-title">Editar pedido</div>
-      <button class="modal-close" onclick="closeEditOrder()">✕</button>
+      <button class="modal-close" onclick="closeEditOrder()" aria-label="Fechar"><i data-lucide="x"></i></button>
     </div>
     <div class="form-grid">
       <div>
@@ -933,7 +1307,7 @@
   <div class="modal-sheet">
     <div class="modal-header">
       <div class="modal-title">Histórico do cliente</div>
-      <button class="modal-close" onclick="closeClientAnalysis()">✕</button>
+      <button class="modal-close" onclick="closeClientAnalysis()" aria-label="Fechar"><i data-lucide="x"></i></button>
     </div>
     <div id="client-analysis-body"></div>
   </div>
@@ -944,14 +1318,14 @@
   <div class="modal-sheet">
     <div class="modal-header">
       <div class="modal-title">Tentativa de venda</div>
-      <button class="modal-close" onclick="closeSalesAttempt()">✕</button>
+      <button class="modal-close" onclick="closeSalesAttempt()" aria-label="Fechar"><i data-lucide="x"></i></button>
     </div>
-    <div style="font-size:13px;color:#8A7160;margin-bottom:14px;">Cliente: <strong id="sa-cliente-nome"></strong></div>
+    <div style="font-size:13px;color:var(--label-secondary);margin-bottom:14px;">Cliente: <strong id="sa-cliente-nome"></strong></div>
 
-    <div style="font-size:12px;font-weight:600;color:#8A7160;margin-bottom:8px;">A venda foi realizada?</div>
-    <div class="outcome-btn-row">
-      <button class="outcome-btn sim" id="sa-btn-sim" onclick="selectSalesOutcome(true)">✅ Sim, comprou</button>
-      <button class="outcome-btn nao" id="sa-btn-nao" onclick="selectSalesOutcome(false)">❌ Não comprou</button>
+    <div style="font-size:12px;font-weight:600;color:var(--label-secondary);margin-bottom:8px;">A venda foi realizada?</div>
+    <div class="outcome-btn-row segmented" id="sa-segmented" style="--seg-on:0">
+      <button class="outcome-btn sim" id="sa-btn-sim" onclick="selectSalesOutcome(true)">Comprou</button>
+      <button class="outcome-btn nao" id="sa-btn-nao" onclick="selectSalesOutcome(false)">Não comprou</button>
     </div>
 
     <div id="sa-motivo-wrap" style="display:none;">
@@ -967,8 +1341,8 @@
 <div class="modal-overlay" id="alerts-panel-overlay" onclick="closeAlertsPanelBg(event)">
   <div class="modal-sheet">
     <div class="modal-header">
-      <div class="modal-title">🔔 Notificações de estoque</div>
-      <button class="modal-close" onclick="closeAlertsPanel()">✕</button>
+      <div class="modal-title">Notificações de estoque</div>
+      <button class="modal-close" onclick="closeAlertsPanel()" aria-label="Fechar"><i data-lucide="x"></i></button>
     </div>
     <div id="alerts-panel-body"></div>
   </div>
@@ -1004,7 +1378,7 @@ const PRODUCTS = [
   "Copo de Cookie (meio amargo)",
   "Copo de Cookie (Ninho)"
 ];
-const PRODUCT_COLORS = ["#B5651D", "#5C3A21", "#D9A441"];
+const productColors = () => [cssVar('--chart-1'), cssVar('--chart-2'), cssVar('--chart-3')];
 
 const RECIPE_CATEGORIES = [
   'Cookie',
@@ -1089,6 +1463,141 @@ async function sha256Hex(text) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+/* ---------- VISUAL iOS: ícones, título, tab bar, menu e sheets ---------- */
+const PAGE_TITLES = {
+  'pedidos': 'Pedidos',
+  'calendario': 'Calendário',
+  'vendas': 'Vendas',
+  'historico': 'Histórico',
+  'estoque-gestao': 'Gerenciamento de Estoque',
+  'estoque-visao': 'Visão de Estoque',
+  'gerenciar-receitas': 'Gerenciar receitas',
+  'receitas-publicas': 'Receitas',
+  'cadastro-clientes': 'Cadastro de clientes',
+  'analise-clientes': 'Análise de clientes',
+  'contas': 'Contas',
+  'precificacao': 'Precificação'
+};
+
+// Abas de atalho na barra flutuante (máx. 5). "also" = abas que mantêm este atalho aceso.
+const TAB_BAR_ITEMS = [
+  { tab: 'pedidos',          label: 'Pedidos',    icon: 'clipboard-list', also: ['historico'] },
+  { tab: 'calendario',       label: 'Calendário', icon: 'calendar' },
+  { tab: 'estoque-visao',    label: 'Estoque',    icon: 'boxes',          also: ['estoque-gestao'] },
+  { tab: 'vendas',           label: 'Vendas',     icon: 'bar-chart-3' },
+  { tab: 'analise-clientes', label: 'Clientes',   icon: 'users',          also: ['cadastro-clientes'] }
+];
+
+// Lê uma cor dos tokens (usado nos gráficos, que não entendem var(--x) direto)
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// Troca <i data-lucide="..."> pelo SVG do ícone, inclusive em conteúdo criado depois
+let iconsQueued = false;
+function refreshIcons() {
+  if (iconsQueued || !window.lucide) return;
+  iconsQueued = true;
+  requestAnimationFrame(() => {
+    iconsQueued = false;
+    try { window.lucide.createIcons(); } catch (e) { console.error('Ícones:', e); }
+  });
+}
+new MutationObserver(refreshIcons).observe(document.documentElement, { childList: true, subtree: true });
+window.addEventListener('lucide-ready', refreshIcons);
+window.addEventListener('load', refreshIcons);
+
+function setPageTitle(text) {
+  document.getElementById('current-tab-label').textContent = text;
+  document.getElementById('nav-title').textContent = text;
+  document.title = text + ' · Copo de Cookie';
+}
+
+function renderTabBar() {
+  const bar = document.getElementById('tabbar');
+  if (!bar) return;
+  const items = TAB_BAR_ITEMS.filter(it => hasAccess(it.tab));
+  bar.style.display = items.length ? 'flex' : 'none';
+  bar.innerHTML = items.map(it => {
+    const active = activeTab === it.tab || (it.also || []).includes(activeTab);
+    return `<button class="tab-item${active ? ' active' : ''}" onclick="switchTab('${it.tab}')" aria-label="${it.label}"${active ? ' aria-current="page"' : ''}>` +
+           `<i data-lucide="${it.icon}"></i><span>${it.label}</span></button>`;
+  }).join('');
+}
+
+// Esconde o título de um grupo do menu quando nenhum item dele está liberado
+function refreshMenuGroups() {
+  document.querySelectorAll('.drawer [data-group]').forEach(sec => {
+    const any = Array.from(sec.querySelectorAll('.drawer-item')).some(el => el.style.display !== 'none');
+    sec.style.display = any ? '' : 'none';
+  });
+}
+
+// Título grande vira título pequeno no centro quando a página rola
+(function initNavbarCollapse() {
+  const nav = document.getElementById('navbar');
+  if (!nav) return;
+  const onScroll = () => nav.classList.toggle('collapsed', window.scrollY > 40);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+
+// Arrastar a sheet para baixo fecha (como no iPhone)
+(function initSheetDrag() {
+  let drag = null;
+  document.addEventListener('pointerdown', e => {
+    const sheet = e.target.closest('.modal-sheet, .drawer');
+    if (!sheet || e.target.closest('button, input, select, textarea, a')) return;
+    const grip = e.target.closest('.modal-header, .menu-head') || (e.target === sheet && e.clientY - sheet.getBoundingClientRect().top < 28);
+    if (!grip) return;
+    drag = { sheet, startY: e.clientY, dy: 0, t: Date.now() };
+  });
+  document.addEventListener('pointermove', e => {
+    if (!drag) return;
+    drag.dy = Math.max(0, e.clientY - drag.startY);
+    drag.sheet.style.transition = 'none';
+    drag.sheet.style.transform = 'translateY(' + drag.dy + 'px)';
+  });
+  const end = () => {
+    if (!drag) return;
+    const { sheet, dy, t } = drag;
+    drag = null;
+    const fast = dy > 40 && (Date.now() - t) < 250;
+    if (dy > 120 || fast) {
+      const overlay = sheet.closest('.modal-overlay, .drawer-overlay');
+      sheet.style.transition = '';
+      sheet.style.transform = '';
+      if (overlay) overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    } else {
+      sheet.style.transition = 'transform 0.35s var(--ease)';
+      sheet.style.transform = '';
+      setTimeout(() => { sheet.style.transition = ''; }, 360);
+    }
+  };
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+})();
+
+// Teclado: Esc fecha a sheet aberta; Enter/Espaço ativam linhas do menu
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const open = Array.from(document.querySelectorAll('.modal-overlay.open, .drawer-overlay.open')).pop();
+    if (open) open.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role="button"]')) {
+    e.preventDefault();
+    e.target.click();
+  }
+});
+
+// Se o aparelho trocar entre claro e escuro, redesenha os gráficos com as cores certas
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (typeof activeTab !== 'undefined' && activeTab === 'vendas') renderVendas();
+  });
+}
+
+
 /* ---------- DRAWER ---------- */
 function openDrawer() {
   document.getElementById('drawer-overlay').classList.add('open');
@@ -1104,21 +1613,7 @@ function closeDrawerBg(e) {
 function switchTab(tab) {
   if (!hasAccess(tab)) return;
   activeTab = tab;
-  const labels = {
-    'pedidos': '📋 Pedidos',
-    'calendario': '📅 Calendário',
-    'vendas': '📊 Vendas',
-    'historico': '🗂️ Histórico',
-    'estoque-gestao': '📦 Gerenciamento de Estoque',
-    'estoque-visao': '📊 Visão de Estoque',
-    'gerenciar-receitas': '📝 Gerenciar receitas',
-    'receitas-publicas': '📖 Receitas',
-    'cadastro-clientes': '🧑\u200d🤝\u200d🧑 Cadastro de clientes',
-    'analise-clientes': '🔎 Análise de clientes',
-    'contas': '🔐 Contas',
-    'precificacao': '💰 Precificação'
-  };
-  document.getElementById('current-tab-label').textContent = labels[tab] || tab;
+  setPageTitle(PAGE_TITLES[tab] || tab);
 
   const tabs = ['pedidos','calendario','vendas','historico','estoque-gestao','estoque-visao','gerenciar-receitas','receitas-publicas','cadastro-clientes','analise-clientes','contas','precificacao'];
   tabs.forEach(t => {
@@ -1128,6 +1623,9 @@ function switchTab(tab) {
     el.classList.toggle('active', el.dataset.tab === tab);
   });
   closeDrawer();
+  renderTabBar();
+  window.scrollTo(0, 0);
+  if (tab === 'pedidos') render();
   if (tab === 'calendario') renderCalendar();
   if (tab === 'vendas') renderVendas();
   if (tab === 'historico') renderHistorico();
@@ -1334,9 +1832,9 @@ function safeOrderHTML(o) {
     return orderHTML(o);
   } catch (e) {
     console.error('Erro ao renderizar pedido', o && o.id, e);
-    return `<div class="order" style="border-left-color:#B33A3A;">
-      <div style="color:#B33A3A;font-size:12.5px;font-weight:600;">⚠️ Não foi possível exibir este pedido</div>
-      <div style="font-size:11.5px;color:#A0917F;margin-top:4px;">ID: ${escapeHtml((o && o.id) || '?')} — Erro: ${escapeHtml(e.message)}</div>
+    return `<div class="order">
+      <div style="color:var(--red-text);font-size:13px;font-weight:600;"><i data-lucide="alert-triangle"></i> Não foi possível exibir este pedido</div>
+      <div style="font-size:12px;color:var(--label-secondary);margin-top:4px;">ID: ${escapeHtml((o && o.id) || '?')} — Erro: ${escapeHtml(e.message)}</div>
     </div>`;
   }
 }
@@ -1376,7 +1874,7 @@ function orderHTML(o) {
       </div>
       <div class="order-products">${escapeHtml(itemsSummary(o.items))}</div>
       ${o.valor ? `<div class="order-value">${fmtMoney(o.valor)}</div>` : ''}
-      ${o.entrega ? `<div class="order-delivery">🚚 ${escapeHtml(o.entrega)}</div>` : ''}
+      ${o.entrega ? `<div class="order-delivery"><i data-lucide="truck"></i> ${escapeHtml(o.entrega)}</div>` : ''}
       <div class="order-meta">
         Pedido em ${fmtDate(o.dataPedido)}
         <span class="status ${isDone ? 'entregue' : ''}">${isDone ? 'Entregue' : 'Pendente'}</span>
@@ -1384,11 +1882,11 @@ function orderHTML(o) {
         <span class="status ${isProduzido ? 'pago' : 'naopago'}">${isProduzido ? 'Produzido' : 'Não produzido'}</span>
       </div>
       <div class="order-actions">
-        <button onclick="openEditOrder('${o.id}')">✏️ Editar</button>
-        <button class="btn-done" onclick="toggleStatus('${o.id}')">${isDone ? '↩ Reabrir' : '✓ Marcar entregue'}</button>
-        <button class="btn-pago" onclick="togglePago('${o.id}')">${isPago ? '↩ Desmarcar pago' : '💰 Marcar como pago'}</button>
-        ${hasAccess('estoque-gestao') ? `<button onclick="toggleProduzido('${o.id}')">${isProduzido ? '↩ Desmarcar produzido' : '🏭 Marcar como produzido'}</button>` : ''}
-        <button class="btn-del" onclick="deleteOrder('${o.id}')">🗑 Remover</button>
+        <button onclick="openEditOrder('${o.id}')"><i data-lucide="pencil"></i> Editar</button>
+        <button class="btn-done" onclick="toggleStatus('${o.id}')">${isDone ? '<i data-lucide="undo-2"></i> Reabrir' : '<i data-lucide="check"></i> Marcar entregue'}</button>
+        <button class="btn-pago" onclick="togglePago('${o.id}')">${isPago ? '<i data-lucide="undo-2"></i> Desmarcar pago' : '<i data-lucide="banknote"></i> Marcar como pago'}</button>
+        ${hasAccess('estoque-gestao') ? `<button onclick="toggleProduzido('${o.id}')">${isProduzido ? '<i data-lucide="undo-2"></i> Desmarcar produzido' : '<i data-lucide="factory"></i> Marcar como produzido'}</button>` : ''}
+        <button class="btn-del" onclick="deleteOrder('${o.id}')"><i data-lucide="trash-2"></i> Remover</button>
       </div>
     </div>
   `;
@@ -1551,8 +2049,8 @@ function dayProductionSummaryHTML(dayOrders) {
   }));
   if (!total) return '';
   return `
-    <div class="card" style="background:#FCEEDD;box-shadow:none;padding:12px 14px;margin-bottom:12px;">
-      <div style="font-size:12px;font-weight:700;color:#B5651D;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:6px;">Resumo pra produzir nesse dia</div>
+    <div class="card" style="background:var(--accent-tint);box-shadow:none;padding:12px 14px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px;">Resumo pra produzir nesse dia</div>
       ${PRODUCTS.map(p => `
         <div class="prod-summary-item" style="padding:6px 0;">
           <div style="font-size:13px;">${p}</div>
@@ -1643,23 +2141,28 @@ function renderVendas() {
   const convertidas = attemptsFiltered.filter(a => a.convertida).length;
   const naoConvertidas = attemptsFiltered.filter(a => !a.convertida).length;
 
-  renderChart('chart-qtd', 'bar', dayLabels, [{ label: 'Unidades', data: qtdData, backgroundColor: '#B5651D' }], 'qtd');
-  renderChart('chart-valor', 'bar', dayLabels, [{ label: 'Valor (R$)', data: valorData, backgroundColor: '#5C3A21' }], 'valor');
-  renderChart('chart-produto', 'doughnut', PRODUCTS.map(p => p.replace('Copo de Cookie ','')), [{ data: PRODUCTS.map(p => byProduct[p]), backgroundColor: PRODUCT_COLORS }], 'produto');
-  renderChart('chart-revenda', 'doughnut', ['Convertidas', 'Não convertidas'], [{ data: [convertidas, naoConvertidas], backgroundColor: ['#567048', '#B33A3A'] }], 'revenda');
+  renderChart('chart-qtd', 'bar', dayLabels, [{ label: 'Unidades', data: qtdData, backgroundColor: cssVar('--chart-1') }], 'qtd');
+  renderChart('chart-valor', 'bar', dayLabels, [{ label: 'Valor (R$)', data: valorData, backgroundColor: cssVar('--chart-2') }], 'valor');
+  renderChart('chart-produto', 'doughnut', PRODUCTS.map(p => p.replace('Copo de Cookie ','')), [{ data: PRODUCTS.map(p => byProduct[p]), backgroundColor: productColors() }], 'produto');
+  renderChart('chart-revenda', 'doughnut', ['Convertidas', 'Não convertidas'], [{ data: [convertidas, naoConvertidas], backgroundColor: [cssVar('--green'), cssVar('--red')] }], 'revenda');
 }
 function renderChart(canvasId, type, labels, datasets, key) {
   const ctx = document.getElementById(canvasId).getContext('2d');
   const existing = { qtd: chartQtd, valor: chartValor, produto: chartProduto, revenda: chartRevenda }[key];
   if (existing) existing.destroy();
+  const textColor = cssVar('--label-secondary');
   const opts = {
     type,
     data: { labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: type === 'doughnut' } },
-      scales: type === 'doughnut' ? {} : { y: { beginAtZero: true } }
+      plugins: { legend: { display: type === 'doughnut', position: 'bottom', labels: { color: textColor, usePointStyle: true, boxWidth: 8, padding: 16, font: { size: 13 } } } },
+      scales: type === 'doughnut' ? {} : {
+        y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: cssVar('--chart-grid') }, border: { display: false } },
+        x: { ticks: { color: textColor }, grid: { display: false }, border: { display: false } }
+      },
+      elements: { arc: { borderWidth: 2, borderColor: cssVar('--bg-grouped-secondary') }, bar: { borderRadius: 6 } }
     }
   };
   const chart = new Chart(ctx, opts);
@@ -1840,28 +2343,28 @@ function renderAlertsPanel() {
 
   const historico = [...meusAlertas()].sort((a,b) => (b.data || '').localeCompare(a.data || '')).slice(0, 30);
 
-  let html = '<div class="section-title" style="margin-top:0">Itens em alerta agora</div>';
+  let html = '<div class="list-header" style="margin-top:0">Itens em alerta agora</div>';
   html += emAlertaAgora.length
-    ? emAlertaAgora.map(x => `
+    ? '<div class="list-group">' + emAlertaAgora.map(x => `
         <div class="alert-live-item nivel-${x.nivel}">
           <div><span class="nivel-dot ${x.nivel}"></span>${escapeHtml(x.item.nome)}</div>
           <div style="font-weight:700;">${x.saldo.toLocaleString('pt-BR')} ${escapeHtml(x.item.unidade)}</div>
         </div>
-      `).join('')
-    : '<div class="empty">Nenhum item em alerta no momento. 🎉</div>';
+      `).join('') + '</div>'
+    : '<div class="empty">Nenhum item em alerta no momento.</div>';
 
-  html += '<div class="section-title">Histórico de notificações</div>';
+  html += '<div class="list-header" style="margin-top:24px">Histórico de notificações</div>';
   html += historico.length
-    ? historico.map(a => `
+    ? '<div class="list-group">' + historico.map(a => `
         <div class="alert-history-row">
           <span class="nivel-dot ${a.nivel}"></span>
           <div style="flex:1;">
-            <strong>${escapeHtml(a.insumo)}</strong> ficou ${a.nivel === 'vermelho' ? '🔴 vermelho' : '🟡 amarelo'}
+            <strong>${escapeHtml(a.insumo)}</strong> ficou ${a.nivel === 'vermelho' ? 'vermelho' : 'amarelo'}
             (${a.quantidade.toLocaleString('pt-BR')} ${escapeHtml(a.unidade)})
           </div>
-          <div style="color:#A0917F;white-space:nowrap;">${fmtDate(a.data.slice(0,10))}</div>
+          <div style="color:var(--label-secondary);white-space:nowrap;">${fmtDate(a.data.slice(0,10))}</div>
         </div>
-      `).join('')
+      `).join('') + '</div>'
     : '<div class="empty">Nenhuma notificação registrada ainda.</div>';
 
   wrap.innerHTML = html;
@@ -2096,14 +2599,14 @@ function renderStockItemsList() {
   wrap.innerHTML = sorted.map(i => `
     <div class="stock-item" style="align-items:flex-start;">
       <div>
-        <div class="stock-item-name">${escapeHtml(i.nome)} <span style="color:#A0917F;font-weight:400;">(${escapeHtml(i.unidade)})</span></div>
+        <div class="stock-item-name">${escapeHtml(i.nome)} <span style="color:var(--label-secondary);font-weight:400;">(${escapeHtml(i.unidade)})</span></div>
         ${(i.limiteAmarelo != null || i.limiteVermelho != null)
-          ? `<div style="font-size:11px;color:#A0917F;margin-top:2px;">🟡 abaixo de ${i.limiteAmarelo != null ? i.limiteAmarelo : '-'} · 🔴 abaixo de ${i.limiteVermelho != null ? i.limiteVermelho : '-'}</div>`
-          : `<div style="font-size:11px;color:#A0917F;margin-top:2px;">Sem limites de aviso definidos</div>`}
+          ? `<div style="font-size:12px;color:var(--label-secondary);margin-top:2px;"><span class="nivel-dot amarelo" style="margin-right:4px"></span>abaixo de ${i.limiteAmarelo != null ? i.limiteAmarelo : '-'} &nbsp; <span class="nivel-dot vermelho" style="margin-right:4px"></span>abaixo de ${i.limiteVermelho != null ? i.limiteVermelho : '-'}</div>`
+          : `<div style="font-size:12px;color:var(--label-secondary);margin-top:2px;">Sem limites de aviso definidos</div>`}
       </div>
       <div style="display:flex;gap:6px;">
-        <button onclick="editStockItem('${i.id}')" style="border:1px solid #E4D9CC;background:#FAF7F2;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;">✏️</button>
-        <button onclick="deleteStockItem('${i.id}')" style="border:1px solid #E4D9CC;background:#FAF7F2;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;color:#B33A3A;">🗑</button>
+        <button class="btn btn-gray btn-sm" onclick="editStockItem('${i.id}')" aria-label="Editar item"><i data-lucide="pencil"></i></button>
+        <button class="btn btn-gray btn-sm" style="color:var(--red-text)" onclick="deleteStockItem('${i.id}')" aria-label="Excluir item"><i data-lucide="trash-2"></i></button>
       </div>
     </div>
   `).join('');
@@ -2121,7 +2624,7 @@ function renderItemDropdown(ctx, query) {
   } else {
     dropdown.innerHTML = matches.slice(0, 30).map(i => `
       <div class="client-dropdown-item" onclick="selectItemFor('${ctx}','${i.id}')">
-        <strong>${escapeHtml(i.nome)}</strong> <span style="color:#A0917F;">(${escapeHtml(i.unidade)})</span>
+        <strong>${escapeHtml(i.nome)}</strong> <span style="color:var(--label-secondary);">(${escapeHtml(i.unidade)})</span>
       </div>
     `).join('');
   }
@@ -2149,7 +2652,7 @@ function renderItemSelectedTag(ctx) {
   if (!wrap) return;
   const sel = itemSelections[ctx];
   wrap.innerHTML = sel
-    ? `<div class="client-selected-tag">📦 ${escapeHtml(sel.nome)} (${escapeHtml(sel.unidade)}) <button onclick="clearItemSelection('${ctx}')">✕</button></div>`
+    ? `<div class="client-selected-tag"><i data-lucide="package"></i> ${escapeHtml(sel.nome)} (${escapeHtml(sel.unidade)}) <button onclick="clearItemSelection('${ctx}')"><i data-lucide="x"></i></button></div>`
     : '';
 }
 
@@ -2182,11 +2685,11 @@ function renderStock() {
           <div>
             <span class="move-tag ${m.tipo}">${m.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span>
             ${escapeHtml(m.insumo)} — ${m.quantidade.toLocaleString('pt-BR')} ${escapeHtml(m.unidade)}
-            ${m.obs ? `<br><span style="color:#A0917F;font-size:11px;">${escapeHtml(m.obs)}</span>` : ''}
+            ${m.obs ? `<br><span style="color:var(--label-secondary);font-size:12px;">${escapeHtml(m.obs)}</span>` : ''}
           </div>
           <div style="text-align:right;white-space:nowrap;">
             ${fmtDate(m.data)}<br>
-            <a href="#" style="color:#B33A3A;font-size:11px;" onclick="event.preventDefault();deleteStockMove('${m.id}')">remover</a>
+            <a href="#" style="color:var(--red-text);font-size:12px;" onclick="event.preventDefault();deleteStockMove('${m.id}')">remover</a>
           </div>
         </div>
       `).join('')
@@ -2308,7 +2811,7 @@ async function doLogin() {
   if (firstAllowed) {
     switchTab(firstAllowed);
   } else {
-    document.getElementById('current-tab-label').textContent = 'Nenhuma aba liberada — fale com o administrador';
+    setPageTitle('Nenhuma aba liberada');
   }
 
   renderBellBadge();
@@ -2328,6 +2831,8 @@ function applyAccountAccess() {
     const tab = el.dataset.tab;
     el.style.display = hasAccess(tab) ? 'flex' : 'none';
   });
+  refreshMenuGroups();
+  renderTabBar();
   if (activeTab && !hasAccess(activeTab)) {
     let firstAllowed = currentAccount.isAdmin
       ? 'pedidos'
@@ -2492,11 +2997,11 @@ function renderAccountsList() {
         <span class="status ${a.isAdmin ? 'publicada' : ''}">${a.isAdmin ? 'Admin' : (a.allowedTabs || []).length + ' aba(s)'}</span>
       </div>
       ${!a.isAdmin && a.allowedTabs && a.allowedTabs.length
-        ? `<div style="font-size:12px;color:#8A7160;margin-top:6px;">${a.allowedTabs.map(k => (ASSIGNABLE_TABS.find(t=>t.key===k)||{}).label).filter(Boolean).join(', ')}</div>`
+        ? `<div style="font-size:12px;color:var(--label-secondary);margin-top:6px;">${a.allowedTabs.map(k => (ASSIGNABLE_TABS.find(t=>t.key===k)||{}).label).filter(Boolean).join(', ')}</div>`
         : ''}
       <div class="recipe-actions">
-        <button onclick="editAccount('${a.id}')">✏️ Editar</button>
-        <button class="btn-del" onclick="deleteAccount('${a.id}')">🗑 Excluir</button>
+        <button onclick="editAccount('${a.id}')"><i data-lucide="pencil"></i> Editar</button>
+        <button class="btn-del" onclick="deleteAccount('${a.id}')"><i data-lucide="trash-2"></i> Excluir</button>
       </div>
     </div>
   `).join('');
@@ -2523,7 +3028,7 @@ function addPricingItemRow(item) {
   row.innerHTML = `
     <input class="pi-nome" type="text" placeholder="Ex: Copo" value="${escapeHtml(nome)}" oninput="renderPricingResult()">
     <input class="pi-valor" type="number" min="0" step="0.01" placeholder="R$" value="${escapeHtml(String(valor))}" oninput="renderPricingResult()">
-    <button class="row-remove" onclick="document.getElementById('${id}').remove(); renderPricingResult();">✕</button>
+    <button class="row-remove" onclick="document.getElementById('${id}').remove(); renderPricingResult();"><i data-lucide="x"></i></button>
   `;
   wrap.appendChild(row);
 }
@@ -2587,7 +3092,7 @@ function renderPricingResult() {
   if (!wrap) return;
 
   if (!r.valido) {
-    wrap.innerHTML = `<div style="color:#B33A3A;font-size:13px;">A soma de despesas variáveis + margem desejada precisa ser menor que 100%.</div>`;
+    wrap.innerHTML = `<div style="color:var(--red-text);font-size:13px;">A soma de despesas variáveis + margem desejada precisa ser menor que 100%.</div>`;
     return;
   }
 
@@ -2684,10 +3189,10 @@ function renderPricingProfilesList() {
           <div class="recipe-name">${escapeHtml(p.nome)}</div>
           <span class="status publicada">${precoSugerido ? fmtMoney(precoSugerido) : '-'}</span>
         </div>
-        <div style="font-size:12px;color:#8A7160;margin-top:4px;">Custo: ${fmtMoney(custoTotal)} · Margem: ${p.margemDesejadaPct}% · Despesas: ${p.despesasVariaveisPct}%</div>
+        <div style="font-size:12px;color:var(--label-secondary);margin-top:4px;">Custo: ${fmtMoney(custoTotal)} · Margem: ${p.margemDesejadaPct}% · Despesas: ${p.despesasVariaveisPct}%</div>
         <div class="recipe-actions">
-          <button onclick="editPricingProfile('${p.id}')">✏️ Editar</button>
-          <button class="btn-del" onclick="deletePricingProfile('${p.id}')">🗑 Excluir</button>
+          <button onclick="editPricingProfile('${p.id}')"><i data-lucide="pencil"></i> Editar</button>
+          <button class="btn-del" onclick="deletePricingProfile('${p.id}')"><i data-lucide="trash-2"></i> Excluir</button>
         </div>
       </div>
     `;
@@ -2713,7 +3218,7 @@ function renderClientDropdown(context, query) {
   } else {
     dropdown.innerHTML = matches.slice(0, 30).map(c => `
       <div class="client-dropdown-item" onclick="selectClientFor('${context}','${c.id}')">
-        <strong>${escapeHtml(c.nome)}</strong>${c.referencia ? ` <span style="color:#A0917F;">— ${escapeHtml(c.referencia)}</span>` : ''}
+        <strong>${escapeHtml(c.nome)}</strong>${c.referencia ? ` <span style="color:var(--label-secondary);">— ${escapeHtml(c.referencia)}</span>` : ''}
       </div>
     `).join('');
   }
@@ -2753,7 +3258,7 @@ function renderSelectedClientTag(context) {
   const prefix = clientPrefix(context);
   const wrap = document.getElementById(prefix + '-cliente-selected');
   wrap.innerHTML = (id || nome)
-    ? `<div class="client-selected-tag">👤 ${escapeHtml(nome)} <button onclick="clearClientSelection('${context}')">✕</button></div>`
+    ? `<div class="client-selected-tag"><i data-lucide="user"></i> ${escapeHtml(nome)} <button onclick="clearClientSelection('${context}')"><i data-lucide="x"></i></button></div>`
     : '';
 }
 
@@ -2864,14 +3369,14 @@ function renderClientsManageList() {
       <div class="client-card-top">
         <div>
           <div class="client-name">${escapeHtml(c.nome)}</div>
-          ${c.telefone ? `<div class="client-ref">📞 ${escapeHtml(c.telefone)}</div>` : ''}
+          ${c.telefone ? `<div class="client-ref"><i data-lucide="phone"></i> ${escapeHtml(c.telefone)}</div>` : ''}
           ${c.referencia ? `<div class="client-ref">${escapeHtml(c.referencia)}</div>` : ''}
         </div>
       </div>
       ${c.observacoes ? `<div class="client-detail-obs" style="margin-top:8px;">${escapeHtml(c.observacoes)}</div>` : ''}
       <div class="recipe-actions">
-        <button onclick="editClient('${c.id}')">✏️ Editar</button>
-        <button class="btn-del" onclick="deleteClient('${c.id}')">🗑 Excluir</button>
+        <button onclick="editClient('${c.id}')"><i data-lucide="pencil"></i> Editar</button>
+        <button class="btn-del" onclick="deleteClient('${c.id}')"><i data-lucide="trash-2"></i> Excluir</button>
       </div>
     </div>
   `).join('');
@@ -2897,28 +3402,10 @@ function renderClientsAnalysisList() {
           <div class="client-name">${escapeHtml(client.nome)}</div>
           ${client.referencia ? `<div class="client-ref">${escapeHtml(client.referencia)}</div>` : ''}
         </div>
-        <span class="client-badge ${count >= 2 ? 'recorrente' : ''}">${count === 0 ? 'Sem pedidos' : count === 1 ? '1 pedido' : (count >= 2 ? '🔥 ' : '') + count + ' pedidos'}</span>
+        <span class="client-badge ${count >= 2 ? 'recorrente' : ''}">${count === 0 ? 'Sem pedidos' : count === 1 ? '1 pedido' : (count >= 2 ? '<i data-lucide="flame"></i>' : '') + count + ' pedidos'}</span>
       </div>
     </div>
   `).join('');
-}
-
-async function analisarClientesComIA() {
-  const btn = document.getElementById('ai-analysis-btn');
-  const out = document.getElementById('ai-analysis-result');
-  btn.disabled = true;
-  btn.textContent = 'Analisando...';
-  out.textContent = '';
-  try {
-    const resp = await fetch('https://kimi-crm-worker.copodecookie.workers.dev', { method: 'POST' });
-    const data = await resp.json();
-    out.textContent = data.erro ? ('Erro: ' + data.erro) : data.analise;
-  } catch (err) {
-    out.textContent = 'Erro ao analisar: ' + err.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Analisar clientes com IA';
-  }
 }
 
 let currentAnalysisClientId = null;
@@ -2956,11 +3443,11 @@ function renderClientAnalysisBody(clientId) {
 
   document.getElementById('client-analysis-body').innerHTML = `
     <div class="client-detail-title">${escapeHtml(c.nome)}</div>
-    ${c.telefone ? `<div class="client-detail-ref">📞 ${escapeHtml(c.telefone)}</div>` : ''}
+    ${c.telefone ? `<div class="client-detail-ref"><i data-lucide="phone"></i> ${escapeHtml(c.telefone)}</div>` : ''}
     ${c.referencia ? `<div class="client-detail-ref">${escapeHtml(c.referencia)}</div>` : ''}
     ${c.observacoes ? `<div class="client-detail-obs">${escapeHtml(c.observacoes)}</div>` : ''}
 
-    <button class="primary" style="margin-bottom:16px;" onclick="openSalesAttempt('${c.id}')">📇 Iniciar tentativa de venda (revenda)</button>
+    <button class="primary" style="margin-bottom:16px;" onclick="openSalesAttempt('${c.id}')"><i data-lucide="phone-call"></i> Iniciar tentativa de venda</button>
 
     <div class="client-kpis">
       <div class="kpi"><div class="kpi-value">${totalPedidos}</div><div class="kpi-label">Pedidos feitos</div></div>
@@ -2968,7 +3455,7 @@ function renderClientAnalysisBody(clientId) {
       <div class="kpi"><div class="kpi-value" style="font-size:13px">${primeira ? fmtDate(primeira) : '-'}</div><div class="kpi-label">Primeira compra</div></div>
       <div class="kpi"><div class="kpi-value" style="font-size:13px">${ultima ? fmtDate(ultima) : '-'}</div><div class="kpi-label">Última compra</div></div>
     </div>
-    <div style="font-size:12px;color:#8A7160;margin:-8px 0 14px;">Intervalo médio entre compras: <strong>${intervaloMedio}</strong> · Produto favorito: <strong>${escapeHtml(produtoFavorito)}</strong></div>
+    <div style="font-size:12px;color:var(--label-secondary);margin:-8px 0 14px;">Intervalo médio entre compras: <strong>${intervaloMedio}</strong> · Produto favorito: <strong>${escapeHtml(produtoFavorito)}</strong></div>
 
     <div class="section-title" style="margin-top:0">Histórico de compras</div>
     ${cOrders.length ? cOrders.map(o => `
@@ -3032,6 +3519,7 @@ function openSalesAttempt(clienteId) {
   document.getElementById('sa-motivo-wrap').style.display = 'none';
   document.getElementById('sa-btn-sim').classList.remove('selected');
   document.getElementById('sa-btn-nao').classList.remove('selected');
+  document.getElementById('sa-segmented').style.setProperty('--seg-on', '0');
   document.getElementById('sales-attempt-overlay').classList.add('open');
 }
 
@@ -3039,6 +3527,9 @@ function selectSalesOutcome(convertida) {
   saOutcome = convertida;
   document.getElementById('sa-btn-sim').classList.toggle('selected', convertida === true);
   document.getElementById('sa-btn-nao').classList.toggle('selected', convertida === false);
+  const seg = document.getElementById('sa-segmented');
+  seg.style.setProperty('--i', convertida ? '0' : '1');
+  seg.style.setProperty('--seg-on', '1');
   document.getElementById('sa-motivo-wrap').style.display = convertida === false ? 'block' : 'none';
 }
 
@@ -3074,6 +3565,25 @@ function closeSalesAttemptBg(e) {
   if (e.target.id === 'sales-attempt-overlay') closeSalesAttempt();
 }
 
+/* ---------- ANÁLISE DE CLIENTES COM IA (Kimi via Cloudflare Worker) ---------- */
+async function analisarClientesComIA() {
+  const btn = document.getElementById('ai-analysis-btn');
+  const out = document.getElementById('ai-analysis-result');
+  btn.disabled = true;
+  btn.textContent = 'Analisando...';
+  out.textContent = '';
+  try {
+    const resp = await fetch('https://kimi-crm-worker.copodecookie.workers.dev', { method: 'POST' });
+    const data = await resp.json();
+    out.textContent = data.erro ? ('Erro: ' + data.erro) : data.analise;
+  } catch (err) {
+    out.textContent = 'Erro ao analisar: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analisar clientes com IA';
+  }
+}
+
 /* ---------- RECEITAS: linhas dinâmicas ---------- */
 function addIngredientRow(ing) {
   const id = 'ing-' + (ingredientCount++);
@@ -3102,7 +3612,7 @@ function addIngredientRow(ing) {
       <div id="${id}-item-selected"></div>
     </div>
     <input class="ing-qtd" type="number" min="0" step="0.01" placeholder="Qtd" value="${escapeHtml(String(quantidade))}" style="flex:1;">
-    <button class="row-remove" onclick="document.getElementById('${id}').remove(); delete itemSelections['${id}'];">✕</button>
+    <button class="row-remove" onclick="document.getElementById('${id}').remove(); delete itemSelections['${id}'];"><i data-lucide="x"></i></button>
   `;
   wrap.appendChild(row);
 
@@ -3120,7 +3630,7 @@ function addStepRow(value) {
   row.id = id;
   row.innerHTML = `
     <input type="text" placeholder="Ex: Misture os ingredientes secos" value="${escapeHtml(value || '')}">
-    <button class="row-remove" onclick="document.getElementById('${id}').remove()">✕</button>
+    <button class="row-remove" onclick="document.getElementById('${id}').remove()"><i data-lucide="x"></i></button>
   `;
   wrap.appendChild(row);
 }
@@ -3262,7 +3772,7 @@ function renderRecipesManageList() {
       <div class="recipe-card-top">
         <div>
           <div class="recipe-name">${escapeHtml(r.nome)}</div>
-          ${r.produto ? `<div style="font-size:11.5px;color:#B5651D;font-weight:600;margin-top:2px;">🔗 ${escapeHtml(r.produto)}</div>` : `<div style="font-size:11.5px;color:#A0917F;margin-top:2px;">Sem sabor vinculado</div>`}
+          ${r.produto ? `<div style="font-size:12px;color:var(--accent);font-weight:600;margin-top:2px;"><i data-lucide="link"></i> ${escapeHtml(r.produto)}</div>` : `<div style="font-size:12px;color:var(--label-secondary);margin-top:2px;">Sem sabor vinculado</div>`}
         </div>
         <span class="status ${r.publicada ? 'publicada' : 'rascunho'}">${r.publicada ? 'Publicada' : 'Rascunho'}</span>
       </div>
@@ -3272,9 +3782,9 @@ function renderRecipesManageList() {
       <div class="recipe-sub">Modo de preparo (${r.passos.length} passos)</div>
       <ul class="recipe-list">${r.passos.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
       <div class="recipe-actions">
-        <button onclick="editRecipe('${r.id}')">✏️ Editar</button>
-        <button onclick="togglePublicada('${r.id}')">${r.publicada ? '👁️‍🗨️ Despublicar' : '📢 Publicar'}</button>
-        <button class="btn-del" onclick="deleteRecipe('${r.id}')">🗑 Excluir</button>
+        <button onclick="editRecipe('${r.id}')"><i data-lucide="pencil"></i> Editar</button>
+        <button onclick="togglePublicada('${r.id}')">${r.publicada ? '<i data-lucide="eye-off"></i> Despublicar' : '<i data-lucide="send"></i> Publicar'}</button>
+        <button class="btn-del" onclick="deleteRecipe('${r.id}')"><i data-lucide="trash-2"></i> Excluir</button>
       </div>
     </div>
   `).join('');
