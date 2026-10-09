@@ -1124,9 +1124,9 @@ select {
         <label>Abas liberadas para esse usuário</label>
         <div class="tab-checklist" id="a-tabs-checklist"></div>
       </div>
-      <div class="checkbox-row" id="a-vendas-equipe-row">
-        <input id="a-vendas-equipe" type="checkbox">
-        <label for="a-vendas-equipe">Ver as vendas da equipe toda na aba Vendas (se desligado, vê só as próprias)</label>
+      <div class="checkbox-row" id="a-dados-equipe-row">
+        <input id="a-dados-equipe" type="checkbox">
+        <label for="a-dados-equipe">Ver os dados da equipe toda em todas as abas: pedidos, clientes, estoque e vendas (se desligado, vê só os próprios)</label>
       </div>
     </div>
     <button class="primary" id="a-submit-btn" onclick="submitAccount()">Salvar conta</button>
@@ -2113,7 +2113,7 @@ function renderVendas() {
   const ini = iniEl.value;
   const fim = fimEl.value;
 
-  const filtered = orders.filter(o => o.dataPedido && o.dataPedido >= ini && o.dataPedido <= fim && o.pago && canSeeSalesOwner(o.donoId));
+  const filtered = orders.filter(o => o.dataPedido && o.dataPedido >= ini && o.dataPedido <= fim && o.pago && canSeeOwner(o.donoId));
 
   let totalQtd = 0, totalValor = 0;
   filtered.forEach(o => {
@@ -2141,7 +2141,7 @@ function renderVendas() {
   PRODUCTS.forEach(p => byProduct[p] = 0);
   filtered.forEach(o => o.items.forEach(it => { byProduct[it.produto] = (byProduct[it.produto] || 0) + it.quantidade; }));
 
-  const attemptsFiltered = salesAttempts.filter(a => a.data && a.data >= ini && a.data <= fim && canSeeSalesOwner(a.donoId));
+  const attemptsFiltered = salesAttempts.filter(a => a.data && a.data >= ini && a.data <= fim && canSeeOwner(a.donoId));
   const convertidas = attemptsFiltered.filter(a => a.convertida).length;
   const naoConvertidas = attemptsFiltered.filter(a => !a.convertida).length;
 
@@ -2741,14 +2741,8 @@ function hasAccess(tab) {
 
 function canSeeOwner(donoId) {
   if (!currentAccount) return false;
-  return currentAccount.isAdmin || !donoId || donoId === currentAccount.id;
-}
-
-// Vendas: admin e contas com a opção ligada veem a equipe toda; as demais, só as próprias
-function canSeeSalesOwner(donoId) {
-  if (!currentAccount) return false;
-  if (currentAccount.isAdmin || currentAccount.verVendasEquipe) return true;
-  return !donoId || donoId === currentAccount.id;
+  // Administrador e contas com "ver dados da equipe" ligado veem tudo; as demais, só o próprio (e o que não tem dono)
+  return currentAccount.isAdmin || currentAccount.verDadosEquipe || !donoId || donoId === currentAccount.id;
 }
 
 function initAccountsSync() {
@@ -2761,8 +2755,8 @@ function initAccountsSync() {
         senha: data.senha || '',
         isAdmin: !!data.isAdmin,
         allowedTabs: data.allowedTabs || [],
-        // Contas antigas (sem o campo) continuam vendo a equipe toda, como era antes
-        verVendasEquipe: data.verVendasEquipe !== false
+        // Contas sem o campo veem só os próprios dados (padrão). verVendasEquipe era o nome da versão anterior.
+        verDadosEquipe: data.verDadosEquipe !== undefined ? !!data.verDadosEquipe : !!data.verVendasEquipe
       };
     });
 
@@ -2782,9 +2776,11 @@ function initAccountsSync() {
     if (currentAccount) {
       const updated = accounts.find(a => a.id === currentAccount.id);
       if (updated) {
+        const mudouVisao = currentAccount.verDadosEquipe !== updated.verDadosEquipe || currentAccount.isAdmin !== updated.isAdmin;
         currentAccount = updated;
         applyAccountAccess();
-        if (activeTab === 'vendas') renderVendas();
+        // Se a visão de dados da própria conta mudou, redesenha a aba aberta com os dados certos
+        if (mudouVisao && activeTab) switchTab(activeTab);
       } else {
         doLogout();
       }
@@ -2871,17 +2867,17 @@ function toggleAdminChecklist() {
   const isAdmin = document.getElementById('a-admin').checked;
   document.getElementById('a-tabs-checklist').classList.toggle('disabled', isAdmin);
   // Administrador já vê tudo: a opção fica ligada e travada
-  const vendasEquipe = document.getElementById('a-vendas-equipe');
-  vendasEquipe.disabled = isAdmin;
-  if (isAdmin) vendasEquipe.checked = true;
-  document.getElementById('a-vendas-equipe-row').style.opacity = isAdmin ? '0.4' : '';
+  const dadosEquipe = document.getElementById('a-dados-equipe');
+  dadosEquipe.disabled = isAdmin;
+  if (isAdmin) dadosEquipe.checked = true;
+  document.getElementById('a-dados-equipe-row').style.opacity = isAdmin ? '0.4' : '';
 }
 
 function clearAccountForm() {
   document.getElementById('a-usuario').value = '';
   document.getElementById('a-senha').value = '';
   document.getElementById('a-admin').checked = false;
-  document.getElementById('a-vendas-equipe').checked = false;
+  document.getElementById('a-dados-equipe').checked = false;
   renderTabChecklist();
   toggleAdminChecklist();
 }
@@ -2902,8 +2898,8 @@ async function submitAccount() {
     return;
   }
 
-  const verVendasEquipe = isAdmin ? true : document.getElementById('a-vendas-equipe').checked;
-  const payload = { usuario, isAdmin, allowedTabs: isAdmin ? [] : allowedTabs, verVendasEquipe };
+  const verDadosEquipe = isAdmin ? true : document.getElementById('a-dados-equipe').checked;
+  const payload = { usuario, isAdmin, allowedTabs: isAdmin ? [] : allowedTabs, verDadosEquipe };
 
   if (editingAccountId) {
     if (senha) payload.senha = await sha256Hex(senha);
@@ -2931,7 +2927,7 @@ function editAccount(id) {
   document.getElementById('a-senha').value = '';
   document.getElementById('a-senha').placeholder = 'Deixe em branco para manter a senha atual';
   document.getElementById('a-admin').checked = a.isAdmin;
-  document.getElementById('a-vendas-equipe').checked = !!a.verVendasEquipe;
+  document.getElementById('a-dados-equipe').checked = !!a.verDadosEquipe;
   renderTabChecklist();
   document.querySelectorAll('.a-tab-check').forEach(c => {
     c.checked = (a.allowedTabs || []).includes(c.value);
@@ -3021,8 +3017,8 @@ function renderAccountsList() {
       ${!a.isAdmin && a.allowedTabs && a.allowedTabs.length
         ? `<div style="font-size:12px;color:var(--label-secondary);margin-top:6px;">${a.allowedTabs.map(k => (ASSIGNABLE_TABS.find(t=>t.key===k)||{}).label).filter(Boolean).join(', ')}</div>`
         : ''}
-      ${!a.isAdmin && (a.allowedTabs || []).includes('vendas')
-        ? `<div style="font-size:12px;color:var(--label-secondary);margin-top:4px;">Vendas: ${a.verVendasEquipe ? 'vê a equipe toda' : 'vê só as próprias'}</div>`
+      ${!a.isAdmin
+        ? `<div style="font-size:12px;color:var(--label-secondary);margin-top:4px;">Dados: ${a.verDadosEquipe ? 'vê a equipe toda' : 'vê só os próprios'}</div>`
         : ''}
       <div class="recipe-actions">
         <button onclick="editAccount('${a.id}')"><i data-lucide="pencil"></i> Editar</button>
