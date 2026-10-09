@@ -1124,6 +1124,10 @@ select {
         <label>Abas liberadas para esse usuário</label>
         <div class="tab-checklist" id="a-tabs-checklist"></div>
       </div>
+      <div class="checkbox-row" id="a-vendas-equipe-row">
+        <input id="a-vendas-equipe" type="checkbox">
+        <label for="a-vendas-equipe">Ver as vendas da equipe toda na aba Vendas (se desligado, vê só as próprias)</label>
+      </div>
     </div>
     <button class="primary" id="a-submit-btn" onclick="submitAccount()">Salvar conta</button>
     <button class="secondary" id="a-cancel-btn" style="display:none" onclick="cancelEditAccount()">Cancelar edição</button>
@@ -2109,7 +2113,7 @@ function renderVendas() {
   const ini = iniEl.value;
   const fim = fimEl.value;
 
-  const filtered = orders.filter(o => o.dataPedido && o.dataPedido >= ini && o.dataPedido <= fim && o.pago);
+  const filtered = orders.filter(o => o.dataPedido && o.dataPedido >= ini && o.dataPedido <= fim && o.pago && canSeeSalesOwner(o.donoId));
 
   let totalQtd = 0, totalValor = 0;
   filtered.forEach(o => {
@@ -2137,7 +2141,7 @@ function renderVendas() {
   PRODUCTS.forEach(p => byProduct[p] = 0);
   filtered.forEach(o => o.items.forEach(it => { byProduct[it.produto] = (byProduct[it.produto] || 0) + it.quantidade; }));
 
-  const attemptsFiltered = salesAttempts.filter(a => a.data && a.data >= ini && a.data <= fim);
+  const attemptsFiltered = salesAttempts.filter(a => a.data && a.data >= ini && a.data <= fim && canSeeSalesOwner(a.donoId));
   const convertidas = attemptsFiltered.filter(a => a.convertida).length;
   const naoConvertidas = attemptsFiltered.filter(a => !a.convertida).length;
 
@@ -2740,6 +2744,13 @@ function canSeeOwner(donoId) {
   return currentAccount.isAdmin || !donoId || donoId === currentAccount.id;
 }
 
+// Vendas: admin e contas com a opção ligada veem a equipe toda; as demais, só as próprias
+function canSeeSalesOwner(donoId) {
+  if (!currentAccount) return false;
+  if (currentAccount.isAdmin || currentAccount.verVendasEquipe) return true;
+  return !donoId || donoId === currentAccount.id;
+}
+
 function initAccountsSync() {
   accountsRef.onSnapshot(snapshot => {
     accounts = snapshot.docs.map(doc => {
@@ -2749,7 +2760,9 @@ function initAccountsSync() {
         usuario: data.usuario || '',
         senha: data.senha || '',
         isAdmin: !!data.isAdmin,
-        allowedTabs: data.allowedTabs || []
+        allowedTabs: data.allowedTabs || [],
+        // Contas antigas (sem o campo) continuam vendo a equipe toda, como era antes
+        verVendasEquipe: data.verVendasEquipe !== false
       };
     });
 
@@ -2771,6 +2784,7 @@ function initAccountsSync() {
       if (updated) {
         currentAccount = updated;
         applyAccountAccess();
+        if (activeTab === 'vendas') renderVendas();
       } else {
         doLogout();
       }
@@ -2856,12 +2870,18 @@ function renderTabChecklist() {
 function toggleAdminChecklist() {
   const isAdmin = document.getElementById('a-admin').checked;
   document.getElementById('a-tabs-checklist').classList.toggle('disabled', isAdmin);
+  // Administrador já vê tudo: a opção fica ligada e travada
+  const vendasEquipe = document.getElementById('a-vendas-equipe');
+  vendasEquipe.disabled = isAdmin;
+  if (isAdmin) vendasEquipe.checked = true;
+  document.getElementById('a-vendas-equipe-row').style.opacity = isAdmin ? '0.4' : '';
 }
 
 function clearAccountForm() {
   document.getElementById('a-usuario').value = '';
   document.getElementById('a-senha').value = '';
   document.getElementById('a-admin').checked = false;
+  document.getElementById('a-vendas-equipe').checked = false;
   renderTabChecklist();
   toggleAdminChecklist();
 }
@@ -2882,7 +2902,8 @@ async function submitAccount() {
     return;
   }
 
-  const payload = { usuario, isAdmin, allowedTabs: isAdmin ? [] : allowedTabs };
+  const verVendasEquipe = isAdmin ? true : document.getElementById('a-vendas-equipe').checked;
+  const payload = { usuario, isAdmin, allowedTabs: isAdmin ? [] : allowedTabs, verVendasEquipe };
 
   if (editingAccountId) {
     if (senha) payload.senha = await sha256Hex(senha);
@@ -2910,6 +2931,7 @@ function editAccount(id) {
   document.getElementById('a-senha').value = '';
   document.getElementById('a-senha').placeholder = 'Deixe em branco para manter a senha atual';
   document.getElementById('a-admin').checked = a.isAdmin;
+  document.getElementById('a-vendas-equipe').checked = !!a.verVendasEquipe;
   renderTabChecklist();
   document.querySelectorAll('.a-tab-check').forEach(c => {
     c.checked = (a.allowedTabs || []).includes(c.value);
@@ -2998,6 +3020,9 @@ function renderAccountsList() {
       </div>
       ${!a.isAdmin && a.allowedTabs && a.allowedTabs.length
         ? `<div style="font-size:12px;color:var(--label-secondary);margin-top:6px;">${a.allowedTabs.map(k => (ASSIGNABLE_TABS.find(t=>t.key===k)||{}).label).filter(Boolean).join(', ')}</div>`
+        : ''}
+      ${!a.isAdmin && (a.allowedTabs || []).includes('vendas')
+        ? `<div style="font-size:12px;color:var(--label-secondary);margin-top:4px;">Vendas: ${a.verVendasEquipe ? 'vê a equipe toda' : 'vê só as próprias'}</div>`
         : ''}
       <div class="recipe-actions">
         <button onclick="editAccount('${a.id}')"><i data-lucide="pencil"></i> Editar</button>
